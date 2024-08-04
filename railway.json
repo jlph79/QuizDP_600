@@ -1,6 +1,14 @@
 {
-    "$schema": "https://schema.up.railway.app/railway.schema.json",
+    "$schema": "https://railway.app/railway.schema.json",
+    "build": {
+      "builder": "NIXPACKS"
+    },
     "deploy": {
-        "startCommand": "streamlit run main.py --server.address 0.0.0.0 --server.port $PORT --server.fileWatcherType none --browser.gatherUsageStats false --client.showErrorDetails false --client.toolbarMode minimal"
+      "runtime": "V2",
+      "numReplicas": 1,
+      "startCommand": "streamlit run main.py --server.address 0.0.0.0 --server.port $PORT --server.fileWatcherType none --browser.gatherUsageStats false --client.showErrorDetails false --client.toolbarMode minimal",
+      "sleepApplication": false,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10
     }
-}
+  }
