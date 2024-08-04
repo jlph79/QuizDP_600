@@ -7,7 +7,7 @@ from utils import load_questions_and_case_studies
 from pages import configuration_page, exam_practice_mode, study_mode
 import os
 
-#IMAGE_DIR = os.path.abspath(r"C:\Users\YourUsername\Path\To\DP-600_Resources")
+# Use os.path.join to create a path that works in both environments
 IMAGE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "DP-600_Resources"))
 def serve_image(image_path):
     with open(image_path, "rb") as f:
@@ -25,7 +25,7 @@ def main():
         if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
             image_path = os.path.join(IMAGE_DIR, filename)
             st.session_state[f"image_{filename}"] = serve_image(image_path)
-            
+
     st.sidebar.title("DP-600 Quiz App")
     
     if 'user_id' not in st.session_state:

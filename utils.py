@@ -3,8 +3,10 @@ import streamlit as st
 from typing import Tuple, List, Dict
 from question import Question
 from case_study import CaseStudy
+import os
 
-JSON_PATH = r"DP-600_Resources\DP600_QuestionsAnswersV2.json"
+# Use os.path.join to create a path that works in both environments
+JSON_PATH = os.path.join("DP-600_Resources", "DP600_QuestionsAnswersV2.json")
 
 @st.cache_data
 def load_questions_and_case_studies(image_dir: str) -> Tuple[List[Question], Dict[str, CaseStudy]]:
