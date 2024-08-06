@@ -8,7 +8,7 @@ def configuration_page(config: Config, user_id: int):
     config.header_font_size = st.slider("Header Font Size", 16, 36, int(config.header_font_size))
     config.body_font_size = st.slider("Body Font Size", 12, 24, int(config.body_font_size))
     config.answer_font_size = st.slider("Answer Font Size", 12, 24, int(config.answer_font_size))
-    config.exam_duration = st.slider("Exam Duration (minutes)", 60, 180, int(config.exam_duration))
+    config.exam_duration = st.slider("Exam Duration (minutes)", 1, 180, int(config.exam_duration))
     config.exam_questions = st.slider("Number of Exam Questions", 20, 100, int(config.exam_questions))
     
     if st.button("Save Configuration"):
@@ -37,7 +37,7 @@ def exam_practice_mode(quiz: Quiz, config: Config):
         timer_placeholder = st.empty()
         
         # Control buttons
-        col1, col2 = st.columns(2)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             if not st.session_state.exam_paused:
                 if st.button("Pause Exam"):
@@ -60,7 +60,19 @@ def exam_practice_mode(quiz: Quiz, config: Config):
                 st.session_state.exam_paused = False
                 st.session_state.exam_finished = True
                 st.success("Exam completed! Your score has been saved.")
+                display_review_list(quiz, config)
                 st.experimental_rerun()
+        
+        with col3:
+            current_question = quiz.get_current_question()
+            if st.button("Mark for Review", key=f"review_{current_question.id}"):
+                quiz.mark_for_review(current_question.id)
+                st.success(f"Question {current_question.id} marked for review.")
+                st.experimental_rerun()
+        
+        with col4:
+            if st.button("Show Review List"):
+                display_review_list(quiz, config)
 
         # Live timer implementation
         if st.session_state.exam_started and not st.session_state.exam_paused:
@@ -106,6 +118,7 @@ def exam_practice_mode(quiz: Quiz, config: Config):
         st.session_state.exam_paused = False
         st.session_state.exam_finished = False
         st.success("Time's up! Exam completed. Your score has been saved.")
+        display_review_list(quiz, config)
         st.experimental_rerun()
 
 def study_mode(quiz: Quiz, config: Config):
@@ -114,8 +127,6 @@ def study_mode(quiz: Quiz, config: Config):
 
 def display_question(quiz: Quiz, config: Config):
     current_question = quiz.get_current_question()
- #   st.markdown(f"<h2 style='font-size:{config.header_font_size}px;'>Question #{current_question.id}</h2>", unsafe_allow_html=True)
-    
     user_answers = current_question.display_question(config, quiz.case_studies)
     
     if current_question.type == "multiple-choice":
@@ -147,3 +158,23 @@ def display_question(quiz: Quiz, config: Config):
         if st.button("Next", key=f"next_{current_question.id}", disabled=quiz.current_index == len(quiz.questions) - 1):
             quiz.go_to_question(quiz.current_index + 1)
             st.experimental_rerun()
+
+def remove_question(quiz: Quiz, question_id: str):
+    quiz.remove_from_review(question_id)
+    st.success(f"Question {question_id} removed from review list.")
+    st.experimental_rerun()
+
+def display_review_list(quiz: Quiz, config: Config):
+    st.markdown(f"<h2 style='font-size:{config.header_font_size}px;'>Questions Marked for Review</h2>", unsafe_allow_html=True)
+    
+    review_list = list(quiz.review_list)
+    if review_list:
+        for question_id in review_list:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"<p style='font-size:{config.body_font_size}px;'>Question {question_id}</p>", unsafe_allow_html=True)
+            with col2:
+                if st.button("🗑️", key=f"remove_{question_id}", on_click=remove_question, args=(quiz, question_id)):
+                    pass
+    else:
+        st.markdown(f"<p style='font-size:{config.body_font_size}px;'>No questions marked for review.</p>", unsafe_allow_html=True)
