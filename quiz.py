@@ -21,6 +21,9 @@ class Quiz:
 
     def start_exam(self, config):
         self.questions = random.sample(self.questions, config.exam_questions)
+        self.current_index = 0
+        self.score = 0
+        self.user_answers = {}
         self.exam_session = ExamSession(
             user_id=self.user_id,
             start_time=datetime.now(),
