@@ -2,7 +2,7 @@ import streamlit as st
 from config import Config
 from user import User, login_page
 from quiz import Quiz
-from database import setup_database
+from database import setup_database, migrate_database
 from utils import load_questions_and_case_studies
 from pages import configuration_page, exam_practice_mode, study_mode
 import os
@@ -15,6 +15,7 @@ def serve_image(image_path):
 
 def main():
     setup_database()
+    migrate_database()
 
     # Set up image serving
     if 'image_dir' not in st.session_state:
@@ -28,17 +29,17 @@ def main():
 
     st.sidebar.title("DP-600 Quiz App")
     
-    if 'user_id' not in st.session_state:
+    if 'user' not in st.session_state:
         login_page()
         return
 
-    user_id = st.session_state.user_id
-    config = Config.load(user_id)
+    user = st.session_state.user
+    config = Config.load(user.user_id)
 
     app_mode = st.sidebar.selectbox("Choose the app mode", ["Study", "Exam Practice", "Configuration"])
 
     if app_mode == "Configuration":
-        configuration_page(config, user_id)
+        configuration_page(config, user.user_id)
     else:
         questions, case_studies = load_questions_and_case_studies(st.session_state.image_dir)
         if not questions:
@@ -46,7 +47,7 @@ def main():
             return
 
         if 'quiz' not in st.session_state or st.session_state.quiz.mode != app_mode.lower():
-            st.session_state.quiz = Quiz.load_progress(questions, case_studies, user_id, app_mode.lower())
+            st.session_state.quiz = Quiz.load_progress(questions, case_studies, user.user_id, app_mode.lower())
         
         quiz = st.session_state.quiz
 
