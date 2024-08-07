@@ -16,43 +16,46 @@ def configuration_page(config: Config, user_id: int):
         st.success("Configuration saved successfully!")
         st.experimental_rerun()
 
+# Add this import at the top if not already present
+from datetime import datetime, timedelta
+
 def exam_practice_mode(quiz: Quiz, config: Config):
     if 'exam_started' not in st.session_state:
-        st.session_state.exam_started = False
-        st.session_state.exam_paused = False
-        st.session_state.exam_end_time = None
-        st.session_state.exam_finished = False
+        reset_exam_state()
 
-    if not st.session_state.exam_started:
+    if not st.session_state.exam_started and not st.session_state.exam_finished:
         st.header("Welcome to Exam Practice Mode")
         st.write(f"Duration: {config.exam_duration} minutes")
         st.write(f"Number of questions: {config.exam_questions}")
         if st.button("Start Exam"):
             quiz.start_exam(config)
             st.session_state.exam_started = True
+            st.session_state.exam_start_time = datetime.now()
             st.session_state.exam_end_time = datetime.now() + timedelta(minutes=config.exam_duration)
+            # Reset quiz state when starting a new exam
+            quiz.current_index = 0
+            quiz.score = 0
+            quiz.user_answers = {}
             st.experimental_rerun()
-    else:
+    elif st.session_state.exam_started:
         # Timer display
         timer_placeholder = st.empty()
-        
+
         # Control buttons
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             if not st.session_state.exam_paused:
                 if st.button("Pause Exam"):
-                    quiz.pause_exam()
                     st.session_state.exam_paused = True
                     st.session_state.pause_time = datetime.now()
                     st.experimental_rerun()
             else:
                 if st.button("Resume Exam"):
-                    quiz.resume_exam()
                     pause_duration = datetime.now() - st.session_state.pause_time
-                    st.session_state.exam_end_time += pause_duration
+                    st.session_state.total_pause_time += pause_duration
                     st.session_state.exam_paused = False
                     st.experimental_rerun()
-        
+
         with col2:
             if st.button("Stop Exam"):
                 quiz.finish_exam()
@@ -75,43 +78,26 @@ def exam_practice_mode(quiz: Quiz, config: Config):
                 display_review_list(quiz, config)
 
         # Live timer implementation
-        if st.session_state.exam_started and not st.session_state.exam_paused:
-            end_time = st.session_state.exam_end_time.timestamp() * 1000  # Convert to milliseconds
-            current_time = datetime.now().timestamp() * 1000
-            initial_time_left = max(end_time - current_time, 0)  # Ensure non-negative
-            
-            timer_script = f"""
-            <div id="timer" style="font-size: 24px; font-weight: bold; color: #FF4B4B; margin-bottom: 20px;"></div>
-            <script>
-                var endTime = {end_time};
-                function updateTimer() {{
-                    var now = new Date().getTime();
-                    var timeLeft = endTime - now;
-                    if (timeLeft <= 0) {{
-                        document.getElementById("timer").innerHTML = "Time's up!";
-                        clearInterval(timerInterval);
-                        window.parent.postMessage({{action: "exam_finished"}}, "*");
-                    }} else {{
-                        var minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-                        var seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-                        document.getElementById("timer").innerHTML = 
-                            "Time remaining: " + minutes.toString().padStart(2, '0') + ":" + seconds.toString().padStart(2, '0');
-                    }}
-                }}
-                updateTimer();  // Initial call to avoid delay
-                var timerInterval = setInterval(updateTimer, 1000);
-            </script>
-            """
-            st.markdown(timer_script, unsafe_allow_html=True)
+        current_time = datetime.now()
+        if st.session_state.exam_paused:
+            time_left = (st.session_state.exam_end_time - st.session_state.pause_time).total_seconds()
         else:
-            remaining_time = st.session_state.exam_end_time - st.session_state.pause_time
-            minutes, seconds = divmod(remaining_time.seconds, 60)
-            timer_placeholder.markdown(f"<div style='font-size: 24px; font-weight: bold; color: #FF4B4B; margin-bottom: 20px;'>Time remaining (Paused): {minutes:02d}:{seconds:02d}</div>", unsafe_allow_html=True)
+            time_left = (st.session_state.exam_end_time - current_time + st.session_state.total_pause_time).total_seconds()
+
+        if time_left <= 0:
+            timer_placeholder.markdown("Time's up!", unsafe_allow_html=True)
+            finish_exam(quiz)
+            return
+        else:
+            minutes, seconds = divmod(int(time_left), 60)
+            timer_placeholder.markdown(f"<div style='font-size: 24px; font-weight: bold; color: #FF4B4B;'>Time remaining: {minutes:02d}:{seconds:02d}</div>", unsafe_allow_html=True)
 
         if not st.session_state.exam_paused:
+            # Display current question
             display_question(quiz, config)
+        else:
+            st.info("Exam is paused. Click 'Resume Exam' to continue.")
 
-    # Check if exam finished
     if st.session_state.exam_finished:
         quiz.finish_exam()
         st.session_state.exam_started = False
