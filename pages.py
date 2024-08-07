@@ -3,6 +3,15 @@ from datetime import datetime, timedelta
 from quiz import Quiz
 from config import Config
 
+def reset_exam_state():
+    st.session_state.exam_started = False
+    st.session_state.exam_finished = False
+    st.session_state.exam_paused = False
+    st.session_state.exam_start_time = None
+    st.session_state.exam_end_time = None
+    st.session_state.pause_time = None
+    st.session_state.total_pause_time = timedelta()
+
 def configuration_page(config: Config, user_id: int):
     st.title("Configuration")
     config.header_font_size = st.slider("Header Font Size", 16, 36, int(config.header_font_size))
@@ -15,9 +24,6 @@ def configuration_page(config: Config, user_id: int):
         config.save(user_id)
         st.success("Configuration saved successfully!")
         st.experimental_rerun()
-
-# Add this import at the top if not already present
-from datetime import datetime, timedelta
 
 def exam_practice_mode(quiz: Quiz, config: Config):
     if 'exam_started' not in st.session_state:
