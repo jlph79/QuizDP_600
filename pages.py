@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import datetime, timedelta
-from quiz import Quiz, finish_exam
+from quiz import Quiz
 from config import Config
 
 def reset_exam_state():
@@ -92,7 +92,7 @@ def exam_practice_mode(quiz: Quiz, config: Config):
 
         if time_left <= 0:
             timer_placeholder.markdown("Time's up!", unsafe_allow_html=True)
-            finish_exam(quiz)
+            quiz.finish_exam()
             return
         else:
             minutes, seconds = divmod(int(time_left), 60)
