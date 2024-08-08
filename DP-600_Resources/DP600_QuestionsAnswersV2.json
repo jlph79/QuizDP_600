@@ -792,7 +792,7 @@
     {
       "id": "#45",
       "case_study_id": null,
-      "question_context": "You have a Fabric workspace that uses the default Spark starter pool and runtime version 1.2. You plan to read a CSV file named Sales_raw.csv in a lakehouse, select columns, and save the data as a Delta table to the managed area of the lakehouse. Sales_raw.csv contains 12 columns.\n\nYou have the following code.\n\nfrom pyspark.sql.functions import year\n(spark\n.red\n.format(\"csv\")\n.option(\"heade\", 'true')\n.load(\"Files/sales_raw.csv\")\n.select('SalesOrderNumber', 'OrderDate', 'CustomerName',\n'UnitPrice')\n.withColumn(\"Year\", year(\"OrderDate\"))\n.write\n.partitionBy('Year')\n.saveAsTable(\"sales\")\n\nFor each of the following statements, select Yes if the statement is true. Otherwise, select No.\n\nNOTE: Each correct selection is worth one point.",
+      "question_context": "You have a Fabric workspace that uses the default Spark starter pool and runtime version 1.2. You plan to read a CSV file named Sales_raw.csv in a lakehouse, select columns, and save the data as a Delta table to the managed area of the lakehouse. Sales_raw.csv contains 12 columns.\n\nYou have the following code.\n\n![41_image_00.png](41_image_00.png)\n\nFor each of the following statements, select Yes if the statement is true. Otherwise, select No.\n\nNOTE: Each correct selection is worth one point.",
       "question_text": "For each of the following statements, select Yes if the statement is true. Otherwise, select No.\n\nNOTE: Each correct selection is worth one point.",
       "question_type": "hotspot",
       "choices": [

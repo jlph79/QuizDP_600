@@ -4,6 +4,7 @@ from typing import Tuple, List, Dict
 from question import Question
 from case_study import CaseStudy
 import os
+import secrets
 
 # Use os.path.join to create a path that works in both environments
 JSON_PATH = os.path.join("DP-600_Resources", "DP600_QuestionsAnswersV2.json")
@@ -22,3 +23,6 @@ def load_questions_and_case_studies(image_dir: str) -> Tuple[List[Question], Dic
     except json.JSONDecodeError:
         st.error(f"Invalid JSON format in file: {JSON_PATH}")
         return [], {}
+
+def generate_temp_token():
+    return secrets.token_urlsafe(32)

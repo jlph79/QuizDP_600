@@ -30,88 +30,108 @@ def exam_practice_mode(quiz: Quiz, config: Config):
         reset_exam_state()
 
     if not st.session_state.exam_started and not st.session_state.exam_finished:
-        st.header("Welcome to Exam Practice Mode")
-        st.write(f"Duration: {config.exam_duration} minutes")
-        st.write(f"Number of questions: {config.exam_questions}")
-        if st.button("Start Exam"):
-            quiz.start_exam(config)
-            st.session_state.exam_started = True
-            st.session_state.exam_start_time = datetime.now()
-            st.session_state.exam_end_time = datetime.now() + timedelta(minutes=config.exam_duration)
-            # Reset quiz state when starting a new exam
-            quiz.current_index = 0
-            quiz.score = 0
-            quiz.user_answers = {}
-            st.experimental_rerun()
+        display_exam_start_page(quiz, config)
     elif st.session_state.exam_started:
-        # Timer display
-        timer_placeholder = st.empty()
+        display_exam_in_progress(quiz, config)
+    else:
+        display_exam_finished(quiz, config)
 
-        # Control buttons
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            if not st.session_state.exam_paused:
-                if st.button("Pause Exam"):
-                    st.session_state.exam_paused = True
-                    st.session_state.pause_time = datetime.now()
-                    st.experimental_rerun()
-            else:
-                if st.button("Resume Exam"):
-                    pause_duration = datetime.now() - st.session_state.pause_time
-                    st.session_state.total_pause_time += pause_duration
-                    st.session_state.exam_paused = False
-                    st.experimental_rerun()
+def display_exam_start_page(quiz: Quiz, config: Config):
+    st.header("Welcome to Exam Practice Mode")
+    st.write(f"Duration: {config.exam_duration} minutes")
+    st.write(f"Number of questions: {config.exam_questions}")
+    if st.button("Start Exam"):
+        quiz.start_exam(config)
+        st.session_state.exam_started = True
+        st.session_state.exam_start_time = datetime.now()
+        st.session_state.exam_end_time = datetime.now() + timedelta(minutes=config.exam_duration)
+        # Reset quiz state when starting a new exam
+        quiz.current_index = 0
+        quiz.score = 0
+        quiz.user_answers = {}
+        st.experimental_rerun()
 
-        with col2:
-            if st.button("Stop Exam"):
-                quiz.finish_exam()
-                st.session_state.exam_started = False
-                st.session_state.exam_paused = False
-                st.session_state.exam_finished = True
-                st.success("Exam completed! Your score has been saved.")
-                display_review_list(quiz, config)
-                st.experimental_rerun()
-        
-        with col3:
-            current_question = quiz.get_current_question()
-            if st.button("Mark for Review", key=f"review_{current_question.id}"):
-                quiz.mark_for_review(current_question.id)
-                st.success(f"Question {current_question.id} marked for review.")
-                st.experimental_rerun()
-        
-        with col4:
-            if st.button("Show Review List"):
-                display_review_list(quiz, config)
+def display_exam_in_progress(quiz: Quiz, config: Config):
+    # Timer display
+    timer_placeholder = st.empty()
 
-        # Live timer implementation
-        current_time = datetime.now()
-        if st.session_state.exam_paused:
-            time_left = (st.session_state.exam_end_time - st.session_state.pause_time).total_seconds()
-        else:
-            time_left = (st.session_state.exam_end_time - current_time + st.session_state.total_pause_time).total_seconds()
-
-        if time_left <= 0:
-            timer_placeholder.markdown("Time's up!", unsafe_allow_html=True)
-            quiz.finish_exam()
-            return
-        else:
-            minutes, seconds = divmod(int(time_left), 60)
-            timer_placeholder.markdown(f"<div style='font-size: 24px; font-weight: bold; color: #FF4B4B;'>Time remaining: {minutes:02d}:{seconds:02d}</div>", unsafe_allow_html=True)
-
+    # Control buttons
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
         if not st.session_state.exam_paused:
-            # Display current question
-            display_question(quiz, config)
+            if st.button("Pause Exam"):
+                st.session_state.exam_paused = True
+                st.session_state.pause_time = datetime.now()
+                st.experimental_rerun()
         else:
-            st.info("Exam is paused. Click 'Resume Exam' to continue.")
+            if st.button("Resume Exam"):
+                pause_duration = datetime.now() - st.session_state.pause_time
+                st.session_state.total_pause_time += pause_duration
+                st.session_state.exam_paused = False
+                st.experimental_rerun()
 
-    if st.session_state.exam_finished:
+    with col2:
+        if st.button("Stop Exam"):
+            quiz.finish_exam()
+            st.session_state.exam_started = False
+            st.session_state.exam_paused = False
+            st.session_state.exam_finished = True
+            st.success("Exam completed! Your score has been saved.")
+            st.experimental_rerun()
+    
+    with col3:
+        current_question = quiz.get_current_question()
+        if st.button("Mark for Review", key=f"review_{current_question.id}"):
+            quiz.mark_for_review(current_question.id)
+            st.success(f"Question {current_question.id} marked for review.")
+            st.experimental_rerun()
+
+    with col4:
+        if st.button("Show Review List"):
+            st.session_state.showing_review_list = True
+            st.experimental_rerun()
+
+    # Live timer implementation
+    current_time = datetime.now()
+    if st.session_state.exam_paused:
+        time_left = (st.session_state.exam_end_time - st.session_state.pause_time).total_seconds()
+    else:
+        time_left = (st.session_state.exam_end_time - current_time + st.session_state.total_pause_time).total_seconds()
+
+    if time_left <= 0:
+        timer_placeholder.markdown("Time's up!", unsafe_allow_html=True)
         quiz.finish_exam()
         st.session_state.exam_started = False
         st.session_state.exam_paused = False
-        st.session_state.exam_finished = False
+        st.session_state.exam_finished = True
         st.success("Time's up! Exam completed. Your score has been saved.")
-        display_review_list(quiz, config)
         st.experimental_rerun()
+    else:
+        minutes, seconds = divmod(int(time_left), 60)
+        timer_placeholder.markdown(f"<div style='font-size: 24px; font-weight: bold; color: #FF4B4B;'>Time remaining: {minutes:02d}:{seconds:02d}</div>", unsafe_allow_html=True)
+
+    if not st.session_state.exam_paused:
+        if 'showing_review_list' in st.session_state and st.session_state.showing_review_list:
+            display_review_list(quiz, config)
+            if st.button("Back to Exam"):
+                st.session_state.showing_review_list = False
+                st.experimental_rerun()
+        else:
+            # Display current question
+            display_question(quiz, config)
+    else:
+        st.info("Exam is paused. Click 'Resume Exam' to continue.")
+
+def display_exam_finished(quiz: Quiz, config: Config):
+    st.header("Exam Finished")
+    st.write(f"Your score: {quiz.score}/{len(quiz.questions)}")
+    
+    if st.button("Start New Exam"):
+        reset_exam_state()
+        st.experimental_rerun()
+    
+    st.subheader("Review List")
+    display_review_list(quiz, config)
 
 def study_mode(quiz: Quiz, config: Config):
     st.markdown(f"<h1 style='font-size:{config.header_font_size + 4}px;'>DP-600 Certificate Quiz App - Study Mode</h1>", unsafe_allow_html=True)
@@ -164,9 +184,51 @@ def display_review_list(quiz: Quiz, config: Config):
         for question_id in review_list:
             col1, col2 = st.columns([3, 1])
             with col1:
-                st.markdown(f"<p style='font-size:{config.body_font_size}px;'>Question {question_id}</p>", unsafe_allow_html=True)
+                if st.button(f"Question {question_id}", key=f"open_{question_id}"):
+                    token = st.session_state.user.generate_temp_token()
+                    js_code = f"""
+                    <script>
+                    window.open('/?question_id={question_id}&token={token}', '_blank');
+                    </script>
+                    """
+                    st.components.v1.html(js_code, height=0)
             with col2:
                 if st.button("🗑️", key=f"remove_{question_id}", on_click=remove_question, args=(quiz, question_id)):
                     pass
     else:
         st.markdown(f"<p style='font-size:{config.body_font_size}px;'>No questions marked for review.</p>", unsafe_allow_html=True)
+
+def study_specific_question(quiz: Quiz, config: Config, question_id: str):
+    question = quiz.get_question_by_id(question_id)
+    if question:
+        st.markdown(f"<h2 style='font-size:{config.header_font_size}px;'>Studying Question {question_id}</h2>", unsafe_allow_html=True)
+        user_answers = question.display_question(config, quiz.case_studies)
+        
+        if question.type == "multiple-choice":
+            if st.button("Submit", key=f"submit_{question_id}"):
+                if user_answers is not None:
+                    is_correct = quiz.check_answer(user_answers)
+                    if is_correct:
+                        st.success("Correct!")
+                    else:
+                        st.error("Incorrect.")
+                    question.display_answer(config)
+                else:
+                    st.warning("Please select an answer before submitting.")
+        
+        if st.button("Close"):
+            js_code = """
+            <script>
+            window.close();
+            </script>
+            """
+            st.components.v1.html(js_code, height=0)
+    else:
+        st.error("Question not found.")
+        if st.button("Close"):
+            js_code = """
+            <script>
+            window.close();
+            </script>
+            """
+            st.components.v1.html(js_code, height=0)

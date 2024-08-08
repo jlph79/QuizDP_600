@@ -2,6 +2,8 @@ import sqlite3
 import json
 import streamlit as st
 from database import DB_PATH
+import secrets
+import time
 
 class User:
     def __init__(self, username, password, user_id=None):
@@ -55,6 +57,29 @@ class User:
                 (user_id, mode, practiced_questions, incorrect_answers, review_list) 
                 VALUES (?, ?, ?, ?, ?)
             ''', (self.user_id, mode, json.dumps(practiced_questions), json.dumps(incorrect_answers), json.dumps(review_list)))
+
+    def generate_temp_token(self):
+        token = secrets.token_urlsafe(32)
+        expiration = int(time.time()) + 3600  # Token valid for 1 hour
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute('INSERT INTO temp_tokens (user_id, token, expiration) VALUES (?, ?, ?)',
+                           (self.user_id, token, expiration))
+        return token
+
+def get_user_by_token(token):
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT user_id FROM temp_tokens WHERE token = ? AND expiration > ?',
+                       (token, int(time.time())))
+        result = cursor.fetchone()
+    if result:
+        user_id = result[0]
+        cursor.execute('SELECT username, password FROM users WHERE id = ?', (user_id,))
+        user_data = cursor.fetchone()
+        if user_data:
+            return User(user_data[0], user_data[1], user_id=user_id)
+    return None
 
 def login_page():
     st.title("Login")

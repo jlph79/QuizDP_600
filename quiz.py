@@ -85,6 +85,12 @@ class Quiz:
     def get_current_question(self) -> Question:
         return self.questions[self.current_index]
 
+    def get_question_by_id(self, question_id: str) -> Optional[Question]:
+        for question in self.questions:
+            if question.id == question_id:
+                return question
+        return None
+
     def check_answer(self, user_answers: Union[List[str], None]) -> bool:
         current_question = self.get_current_question()
         is_correct = False

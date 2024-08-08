@@ -52,6 +52,15 @@ def setup_database():
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS temp_tokens (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER,
+                token TEXT UNIQUE,
+                expiration INTEGER,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
 
 def migrate_database():
     with sqlite3.connect(DB_PATH) as conn:
