@@ -137,7 +137,7 @@
       "id": "#7",
       "case_study_id": "Litware, Inc.",
       "question_context": "You need to resolve the issue with the pricing group classification.",
-      "question_text": "How should you complete the T-SQL statement? To answer, select the appropriate options in the answer area.\n\nNOTE: Each correct selection is worth one point.",
+      "question_text": "## Report Requirement\n\n - Data analysts are tasked with creating a customer satisfaction report that fulfills the following criteria:\n    - Allows users to select a product and filter customer survey responses to those who purchased that specific product.\n    - Displays the average overall satisfaction score for all surveys submitted within the past 12 months up to a selected date.\n    - Reflects data updates in the data store as soon as they occur.\n    - Limits the report and semantic model data to the current and previous year.\n    - Respects any table-level security defined in the source data store.\n    - Minimizes the execution time of report queries. How should you complete the T-SQL statement? To answer, select the appropriate options in the answer area.\n\nNOTE: Each correct selection is worth one point.",
       "question_type": "hotspot",
       "choices": [
         "17_image_0.png"
@@ -709,12 +709,12 @@
       "question_text": "Which type of data store should you use?",
       "question_type": "multiple-choice",
       "choices": [
-        {"label": "A", "text": "a lakehouse"},
+        {"label": "A", "text": "a Lakehouse"},
         {"label": "B", "text": "an Azure SQL database"},
-        {"label": "C", "text": "a warehouse"},
+        {"label": "C", "text": "a Warehouse"},
         {"label": "D", "text": "a KQL database"}
       ],
-      "correct_answers": ["C"],
+      "correct_answers": ["A","C"],
       "correct_answers_community": ["A"],
       "images": []
     },
