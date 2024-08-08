@@ -3,21 +3,27 @@ from datetime import datetime, timedelta
 from quiz import Quiz
 from config import Config
 
+def reset_exam_state():
+    st.session_state.exam_started = False
+    st.session_state.exam_finished = False
+    st.session_state.exam_paused = False
+    st.session_state.exam_start_time = None
+    st.session_state.exam_end_time = None
+    st.session_state.pause_time = None
+    st.session_state.total_pause_time = timedelta()
+
 def configuration_page(config: Config, user_id: int):
     st.title("Configuration")
     config.header_font_size = st.slider("Header Font Size", 16, 36, int(config.header_font_size))
     config.body_font_size = st.slider("Body Font Size", 12, 24, int(config.body_font_size))
     config.answer_font_size = st.slider("Answer Font Size", 12, 24, int(config.answer_font_size))
-    config.exam_duration = st.slider("Exam Duration (minutes)", 60, 180, int(config.exam_duration))
+    config.exam_duration = st.slider("Exam Duration (minutes)", 1, 180, int(config.exam_duration))
     config.exam_questions = st.slider("Number of Exam Questions", 20, 100, int(config.exam_questions))
     
     if st.button("Save Configuration"):
         config.save(user_id)
         st.success("Configuration saved successfully!")
         st.experimental_rerun()
-
-# Add this import at the top if not already present
-from datetime import datetime, timedelta
 
 def exam_practice_mode(quiz: Quiz, config: Config):
     if 'exam_started' not in st.session_state:
@@ -42,7 +48,7 @@ def exam_practice_mode(quiz: Quiz, config: Config):
         timer_placeholder = st.empty()
 
         # Control buttons
-        col1, col2 = st.columns(2)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             if not st.session_state.exam_paused:
                 if st.button("Pause Exam"):
@@ -58,8 +64,24 @@ def exam_practice_mode(quiz: Quiz, config: Config):
 
         with col2:
             if st.button("Stop Exam"):
-                finish_exam(quiz)
-                return
+                quiz.finish_exam()
+                st.session_state.exam_started = False
+                st.session_state.exam_paused = False
+                st.session_state.exam_finished = True
+                st.success("Exam completed! Your score has been saved.")
+                display_review_list(quiz, config)
+                st.experimental_rerun()
+        
+        with col3:
+            current_question = quiz.get_current_question()
+            if st.button("Mark for Review", key=f"review_{current_question.id}"):
+                quiz.mark_for_review(current_question.id)
+                st.success(f"Question {current_question.id} marked for review.")
+                st.experimental_rerun()
+        
+        with col4:
+            if st.button("Show Review List"):
+                display_review_list(quiz, config)
 
         # Live timer implementation
         current_time = datetime.now()
@@ -83,19 +105,13 @@ def exam_practice_mode(quiz: Quiz, config: Config):
             st.info("Exam is paused. Click 'Resume Exam' to continue.")
 
     if st.session_state.exam_finished:
-        st.success("Exam session done!")
-        total_time = (st.session_state.exam_end_time - st.session_state.exam_start_time - st.session_state.total_pause_time).total_seconds()
-        st.write(f"Total time elapsed: {total_time // 60:.0f} minutes {total_time % 60:.0f} seconds")
-        st.write(f"Total questions: {len(quiz.questions)}")
-        st.write(f"Correct answers: {quiz.score}")
-        
-        if st.button("Start New Exam"):
-            reset_exam_state()
-            # Reset quiz state when starting a new exam
-            quiz.current_index = 0
-            quiz.score = 0
-            quiz.user_answers = {}
-            st.experimental_rerun()     
+        quiz.finish_exam()
+        st.session_state.exam_started = False
+        st.session_state.exam_paused = False
+        st.session_state.exam_finished = False
+        st.success("Time's up! Exam completed. Your score has been saved.")
+        display_review_list(quiz, config)
+        st.experimental_rerun()
 
 def study_mode(quiz: Quiz, config: Config):
     st.markdown(f"<h1 style='font-size:{config.header_font_size + 4}px;'>DP-600 Certificate Quiz App - Study Mode</h1>", unsafe_allow_html=True)
@@ -103,8 +119,6 @@ def study_mode(quiz: Quiz, config: Config):
 
 def display_question(quiz: Quiz, config: Config):
     current_question = quiz.get_current_question()
- #   st.markdown(f"<h2 style='font-size:{config.header_font_size}px;'>Question #{current_question.id}</h2>", unsafe_allow_html=True)
-    
     user_answers = current_question.display_question(config, quiz.case_studies)
     
     if current_question.type == "multiple-choice":
@@ -137,24 +151,22 @@ def display_question(quiz: Quiz, config: Config):
             quiz.go_to_question(quiz.current_index + 1)
             st.experimental_rerun()
 
-def finish_exam(quiz):
-    quiz.finish_exam()
-    st.session_state.exam_started = False
-    st.session_state.exam_paused = False
-    st.session_state.exam_finished = True
-    st.success("Exam completed! Your score has been saved.")
+def remove_question(quiz: Quiz, question_id: str):
+    quiz.remove_from_review(question_id)
+    st.success(f"Question {question_id} removed from review list.")
     st.experimental_rerun()
 
-def reset_exam_state():
-    st.session_state.exam_started = False
-    st.session_state.exam_paused = False
-    st.session_state.exam_end_time = None
-    st.session_state.exam_finished = False
-    st.session_state.exam_start_time = None
-    st.session_state.pause_time = None
-    st.session_state.total_pause_time = timedelta()
-    # Reset the quiz state
-    if 'quiz' in st.session_state:
-        st.session_state.quiz.current_index = 0
-        st.session_state.quiz.score = 0
-        st.session_state.quiz.user_answers = {}
+def display_review_list(quiz: Quiz, config: Config):
+    st.markdown(f"<h2 style='font-size:{config.header_font_size}px;'>Questions Marked for Review</h2>", unsafe_allow_html=True)
+    
+    review_list = list(quiz.review_list)
+    if review_list:
+        for question_id in review_list:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"<p style='font-size:{config.body_font_size}px;'>Question {question_id}</p>", unsafe_allow_html=True)
+            with col2:
+                if st.button("🗑️", key=f"remove_{question_id}", on_click=remove_question, args=(quiz, question_id)):
+                    pass
+    else:
+        st.markdown(f"<p style='font-size:{config.body_font_size}px;'>No questions marked for review.</p>", unsafe_allow_html=True)
