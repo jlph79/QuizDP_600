@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import datetime, timedelta
-from quiz import Quiz
+from quiz import Quiz, finish_exam
 from config import Config
 
 def reset_exam_state():
