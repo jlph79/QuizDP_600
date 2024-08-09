@@ -7,7 +7,7 @@ import os
 import secrets
 
 # Use os.path.join to create a path that works in both environments
-JSON_PATH = os.path.join("DP-600_Resources", "DP600_QuestionsAnswersV2.json")
+JSON_PATH = os.path.join("DP-600_Resources", "DP600_QuestionsAnswersV3.json")
 
 @st.cache_data
 def load_questions_and_case_studies(image_dir: str) -> Tuple[List[Question], Dict[str, CaseStudy]]:

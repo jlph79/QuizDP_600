@@ -18,6 +18,7 @@ def setup_database():
                 header_font_size INTEGER,
                 body_font_size INTEGER,
                 answer_font_size INTEGER,
+                choice_font_size INTEGER,
                 exam_duration INTEGER,
                 exam_questions INTEGER,
                 FOREIGN KEY (user_id) REFERENCES users (id)
@@ -93,6 +94,13 @@ def migrate_database():
             cursor.execute("ALTER TABLE exam_sessions ADD COLUMN review_list TEXT")
         if 'algorithm_performance' not in columns:
             cursor.execute("ALTER TABLE exam_sessions ADD COLUMN algorithm_performance TEXT")
+        
+        # Check if choice_font_size column exists in user_config table
+        cursor.execute("PRAGMA table_info(user_config)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'choice_font_size' not in columns:
+            cursor.execute("ALTER TABLE user_config ADD COLUMN choice_font_size INTEGER DEFAULT 16")
 
 # Call both functions
 setup_database()

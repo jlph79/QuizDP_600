@@ -109,11 +109,7 @@ class Quiz:
 
     def check_answer(self, user_answers: Union[List[str], None]) -> bool:
         current_question = self.get_current_question()
-        is_correct = False
-        if current_question.type == "multiple-choice":
-            correct_answers = set(current_question.correct_answers)
-            user_answer_set = set(ans[0] for ans in user_answers) if user_answers else set()
-            is_correct = user_answer_set == correct_answers
+        is_correct = current_question.check_answer(user_answers)
         
         if is_correct:
             self.score += 1

@@ -17,6 +17,7 @@ def configuration_page(config: Config, user_id: int):
     config.header_font_size = st.slider("Header Font Size", 16, 36, int(config.header_font_size))
     config.body_font_size = st.slider("Body Font Size", 12, 24, int(config.body_font_size))
     config.answer_font_size = st.slider("Answer Font Size", 12, 24, int(config.answer_font_size))
+    config.choice_font_size = st.slider("Choice Font Size", 12, 24, int(config.choice_font_size))
     config.exam_duration = st.slider("Exam Duration (minutes)", 1, 180, int(config.exam_duration))
     config.exam_questions = st.slider("Number of Exam Questions", 20, 100, int(config.exam_questions))
     
@@ -139,11 +140,45 @@ def study_mode(quiz: Quiz, config: Config):
 
 def display_question(quiz: Quiz, config: Config):
     current_question = quiz.get_current_question()
-    user_answers = current_question.display_question(config, quiz.case_studies)
     
+    # Display question number
+    st.markdown(f"<h2 style='font-size:{config.header_font_size}px;'>Question {current_question.id}</h2>", unsafe_allow_html=True)
+    
+    # Display case study if available
+    if current_question.case_study_id:
+        case_study = quiz.case_studies.get(current_question.case_study_id)
+        if case_study:
+            with st.expander("View Case Study"):
+                case_study.display(config)
+    
+    # Display question context and text with images
+    current_question.display_context_with_images(config)
+    
+    user_answers = []
     if current_question.type == "multiple-choice":
+        for idx, choice in enumerate(current_question.choices):
+            label = chr(65 + idx)  # Convert 0, 1, 2, ... to A, B, C, ...
+            checked = st.checkbox(f"{label} - {choice['text']}", key=f"option_{current_question.id}_{idx}")
+            if checked:
+                user_answers.append(label)
+    elif current_question.type == "single-choice":
+        options = [f"{chr(65 + idx)} - {choice['text']}" for idx, choice in enumerate(current_question.choices)]
+        selected = st.radio("Select one option:", options, key=f"option_{current_question.id}")
+        if selected:
+            user_answers = [selected[0]]  # Extract the label (A, B, C, ...)
+    elif current_question.type in ["hotspot", "drag-and-drop"]:
+        st.write("This is a hotspot or drag-and-drop question. Please refer to the image below.")
+        if current_question.choices and isinstance(current_question.choices[0], str) and current_question.choices[0].lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+            current_question.display_image(current_question.choices[0], "Question Image")
+        
+        if st.button("Display Answer", key=f"display_answer_{current_question.id}"):
+            current_question.display_answer(config)
+    else:
+        st.write("This question type is not yet implemented.")
+    
+    if current_question.type not in ["hotspot", "drag-and-drop"]:
         if st.button("Submit", key=f"submit_{current_question.id}"):
-            if user_answers is not None:
+            if user_answers:
                 is_correct = quiz.check_answer(user_answers)
                 if is_correct:
                     st.success("Correct!")
@@ -202,11 +237,42 @@ def study_specific_question(quiz: Quiz, config: Config, question_id: str):
     question = quiz.get_question_by_id(question_id)
     if question:
         st.markdown(f"<h2 style='font-size:{config.header_font_size}px;'>Studying Question {question_id}</h2>", unsafe_allow_html=True)
-        user_answers = question.display_question(config, quiz.case_studies)
         
+        # Display case study if available
+        if question.case_study_id:
+            case_study = quiz.case_studies.get(question.case_study_id)
+            if case_study:
+                with st.expander("View Case Study"):
+                    case_study.display(config)
+        
+        # Display question context and text with images
+        question.display_context_with_images(config)
+        
+        user_answers = []
         if question.type == "multiple-choice":
+            for idx, choice in enumerate(question.choices):
+                label = chr(65 + idx)  # Convert 0, 1, 2, ... to A, B, C, ...
+                checked = st.checkbox(f"{label} - {choice['text']}", key=f"option_{question_id}_{idx}")
+                if checked:
+                    user_answers.append(label)
+        elif question.type == "single-choice":
+            options = [f"{chr(65 + idx)} - {choice['text']}" for idx, choice in enumerate(question.choices)]
+            selected = st.radio("Select one option:", options, key=f"option_{question_id}")
+            if selected:
+                user_answers = [selected[0]]  # Extract the label (A, B, C, ...)
+        elif question.type in ["hotspot", "drag-and-drop"]:
+            st.write("This is a hotspot or drag-and-drop question. Please refer to the image below.")
+            if question.choices and isinstance(question.choices[0], str) and question.choices[0].lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                question.display_image(question.choices[0], "Question Image")
+            
+            if st.button("Display Answer", key=f"display_answer_{question_id}"):
+                question.display_answer(config)
+        else:
+            st.write("This question type is not yet implemented.")
+        
+        if question.type not in ["hotspot", "drag-and-drop"]:
             if st.button("Submit", key=f"submit_{question_id}"):
-                if user_answers is not None:
+                if user_answers:
                     is_correct = quiz.check_answer(user_answers)
                     if is_correct:
                         st.success("Correct!")

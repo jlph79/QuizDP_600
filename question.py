@@ -17,13 +17,19 @@ class Question:
         self.case_study_id = data.get('case_study_id')
 
     def display_image(self, image_filename, caption):
-        if f"image_{image_filename}" in st.session_state:
-            image_data = st.session_state[f"image_{image_filename}"]
-            image_base64 = base64.b64encode(image_data).decode()
-            st.markdown(f'<img src="data:image/png;base64,{image_base64}" alt="{caption}" style="max-width:100%;">', unsafe_allow_html=True)
-            st.caption(caption)
-        else:
-            st.error(f"Image not found: {image_filename}")
+        if f"image_{image_filename}" not in st.session_state:
+            image_path = os.path.join('DP-600_Resources', image_filename)
+            if os.path.exists(image_path):
+                with open(image_path, "rb") as image_file:
+                    st.session_state[f"image_{image_filename}"] = image_file.read()
+            else:
+                st.error(f"Image file not found: {image_path}")
+                return
+
+        image_data = st.session_state[f"image_{image_filename}"]
+        image_base64 = base64.b64encode(image_data).decode()
+        st.markdown(f'<img src="data:image/png;base64,{image_base64}" alt="{caption}" style="max-width:100%;">', unsafe_allow_html=True)
+        st.caption(caption)
 
     def display_question(self, config, case_studies):
         if self.case_study_id:
@@ -44,7 +50,11 @@ class Question:
         elif self.type == "multiple-choice":
             options = [f"{chr(65 + i)}. {choice['text']}" for i, choice in enumerate(self.choices)]
             selected_options = st.multiselect("Select answer(s):", options, key=f"question_{self.id}")
-            return selected_options
+            return [option[0] for option in selected_options]  # Return only the labels (A, B, C, etc.)
+        elif self.type == "single-choice":
+            options = [f"{chr(65 + i)}. {choice['text']}" for i, choice in enumerate(self.choices)]
+            selected_option = st.radio("Select one option:", options, key=f"question_{self.id}")
+            return [selected_option[0]] if selected_option else []  # Return the label as a list
         else:
             st.markdown(f"<p style='font-size:{config.body_font_size}px;'>This question type is not yet implemented.</p>", unsafe_allow_html=True)
         return None
@@ -57,7 +67,7 @@ class Question:
                     self.display_image(answer, "Answer Image")
                 else:
                     st.markdown(f"<p style='font-size:{config.answer_font_size}px;'>{answer}</p>", unsafe_allow_html=True)
-        elif self.type == "multiple-choice":
+        elif self.type in ["multiple-choice", "single-choice"]:
             answer_texts = [f"{ans}. {self.choices[ord(ans) - ord('A')]['text']}" for ans in self.correct_answers]
             st.markdown(f"<p style='font-size:{config.answer_font_size}px;'>{', '.join(answer_texts)}</p>", unsafe_allow_html=True)
         else:
@@ -69,22 +79,25 @@ class Question:
                 st.markdown(f"<p style='font-size:{config.answer_font_size}px;'>{answer}</p>", unsafe_allow_html=True)
 
     def display_context_with_images(self, config):
-        image_pattern = r'!\[(.*?)\]\((.*?)\)'
-        parts = re.split(image_pattern, self.context)
-        for i, part in enumerate(parts):
-            if i % 3 == 0:  # Text content
-                st.markdown(f"<p style='font-size:{config.body_font_size}px;'>{part}</p>", unsafe_allow_html=True)
-            elif i % 3 == 2:  # Image filename
-                self.display_image(part, f"Context Image {i//3 + 1}")
-        
-        # Display question text only if it's different from the last part of the context
-        if self.text.strip() != parts[-1].strip():
-            st.markdown(f"<p style='font-size:{config.body_font_size}px;'>{self.text}</p>", unsafe_allow_html=True)
+        def process_content(content):
+            image_pattern = r'!\[(.*?)\]\((.*?)\)'
+            parts = re.split(image_pattern, content)
+            for i, part in enumerate(parts):
+                if i % 3 == 0:  # Text content
+                    st.markdown(f"<p style='font-size:{config.body_font_size}px;'>{part}</p>", unsafe_allow_html=True)
+                elif i % 3 == 2:  # Image filename
+                    self.display_image(part, f"Image {i//3 + 1}")
 
+        # Process context
+        process_content(self.context)
+        
+        # Process question text
+        if self.text.strip() != self.context.strip():
+            process_content(self.text)
 
     def check_answer(self, user_answers):
-        if self.type == "multiple-choice":
+        if self.type in ["multiple-choice", "single-choice"]:
             correct_answers = set(self.correct_answers)
-            user_answer_set = set(ans[0] for ans in user_answers) if user_answers else set()
+            user_answer_set = set(user_answers)
             return user_answer_set == correct_answers
         return False
