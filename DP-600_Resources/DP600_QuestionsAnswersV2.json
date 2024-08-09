@@ -1815,7 +1815,7 @@
     {
       "id": "#105",
       "case_study_id": null,
-      "question_context": "You have a Fabric tenant that contains a lakehouse named Lakehouse1. Lakehouse1 contains a Delta table named Customer.\n\nWhen you query Customer, you discover that the query is slow to execute. You suspect that maintenance was NOT performed on the table.\n\nYou need to identify whether maintenance tasks were performed on Customer.\n\nSolution: You run the following Spark SQL statement:\n\nDESCRIBE DETAIL customer -",
+      "question_context": "You have a Fabric tenant that contains a lakehouse named Lakehouse1. Lakehouse1 contains a Delta table named Customer.\n\nWhen you query Customer, you discover that the query is slow to execute. You suspect that maintenance was NOT performed on the table.\n\nYou need to identify whether maintenance tasks were performed on Customer.\n\nSolution: You run the following Spark SQL statement:\n\n```DESCRIBE DETAIL customer ```",
       "question_text": "Does this meet the goal?",
       "question_type": "multiple-choice",
       "choices": [
@@ -1829,7 +1829,7 @@
     {
       "id": "#106",
       "case_study_id": null,
-      "question_context": "You have a Fabric tenant that contains a new semantic model in OneLake.\n\nYou use a Fabric notebook to read the data into a Spark DataFrame.\n\nYou need to evaluate the data to calculate the min, max, mean, and standard deviation values for all the string and numeric columns.\n\nSolution: You use the following PySpark expression:\n\ndf.explain().show()",
+      "question_context": "You have a Fabric tenant that contains a new semantic model in OneLake.\n\nYou use a Fabric notebook to read the data into a Spark DataFrame.\n\nYou need to evaluate the data to calculate the min, max, mean, and standard deviation values for all the string and numeric columns.\n\nSolution: You use the following PySpark expression:\n\n```df.explain().show()```",
       "question_text": "Does this meet the goal?",
       "question_type": "multiple-choice",
       "choices": [
@@ -1843,7 +1843,7 @@
     {
       "id": "#107",
       "case_study_id": null,
-      "question_context": "You have a Fabric tenant that contains a semantic model named Model1.\n\nYou discover that the following query performs slowly against Model1.\n\nYou need to reduce the execution time of the query.\n\nSolution: You replace line 4 by using the following code:\n\nISEMPTY ( RELATEDTABLE ( 'Order Item' ) )",
+      "question_context": "You have a Fabric tenant that contains a semantic model named Model1.\n\nYou discover that the following query performs slowly against Model1.\n\nYou need to reduce the execution time of the query.\n\nSolution: You replace line 4 by using the following code:\n\n```ISEMPTY ( RELATEDTABLE ( 'Order Item' ) )```",
       "question_text": "Does this meet the goal?",
       "question_type": "multiple-choice",
       "choices": [
@@ -1857,7 +1857,7 @@
     {
       "id": "#108",
       "case_study_id": null,
-      "question_context": "You have a Fabric tenant that contains a semantic model named Model1.\n\nYou discover that the following query performs slowly against Model1.\n\nYou need to reduce the execution time of the query.\n\nSolution: You replace line 4 by using the following code:\n\nNOT ISEMPTY ( CALCULATETABLE ( 'Order Item ' ) )",
+      "question_context": "You have a Fabric tenant that contains a semantic model named Model1.\n\nYou discover that the following query performs slowly against Model1.\n\n![108_Image_00.Png](108_Image_00.Png)\n\nYou need to reduce the execution time of the query.\n\nSolution: You replace line 4 by using the following code:\n\n```NOT ISEMPTY ( CALCULATETABLE ( 'Order Item ' ) )```",
       "question_text": "Does this meet the goal?",
       "question_type": "multiple-choice",
       "choices": [
@@ -1871,7 +1871,7 @@
     {
       "id": "#109",
       "case_study_id": null,
-      "question_context": "You have a Fabric tenant that contains a semantic model named Model1.\n\nYou discover that the following query performs slowly against Model1.\n![112_Image_0.Png](108_Image_0.Png)\n\nYou need to reduce the execution time of the query.\n\nSolution: You replace line 4 by using the following code:\n\nCALCULATE ( COUNTROWS ( 'Order Item' ) ) >= 0",
+      "question_context": "You have a Fabric tenant that contains a semantic model named Model1.\n\nYou discover that the following query performs slowly against Model1.\n![112_Image_0.Png](108_Image_0.Png)\n\nYou need to reduce the execution time of the query.\n\nSolution: You replace line 4 by using the following code:\n\n```CALCULATE ( COUNTROWS ( 'Order Item' ) ) >= 0```",
       "question_text": "Does this meet the goal?",
       "question_type": "multiple-choice",
       "choices": [
