@@ -13,6 +13,21 @@ def serve_image(image_path):
     with open(image_path, "rb") as f:
         return f.read()
 
+def algorithm_performance_page(quiz):
+    st.title("Algorithm Performance")
+    
+    performance = quiz.get_algorithm_performance()
+    
+    st.write("Current Algorithm Performance:")
+    st.write(f"Total questions presented: {performance['total_questions_presented']}")
+    st.write(f"Unique questions presented: {performance['unique_questions_presented']}")
+    st.write(f"Questions until full coverage: {performance['questions_until_full_coverage']}")
+    
+    if st.button("Reset Algorithm"):
+        quiz.reset_tracking()
+        st.success("Algorithm has been reset to zero.")
+        st.experimental_rerun()
+
 def main():
     setup_database()
     migrate_database()
@@ -53,10 +68,15 @@ def main():
         study_specific_question(st.session_state.quiz, config, question_id)
         return
 
-    app_mode = st.sidebar.selectbox("Choose the app mode", ["Study", "Exam Practice", "Configuration"])
+    app_mode = st.sidebar.selectbox("Choose the app mode", ["Study", "Exam Practice", "Configuration", "Algorithm Performance"])
 
     if app_mode == "Configuration":
         configuration_page(config, user.user_id)
+    elif app_mode == "Algorithm Performance":
+        questions, case_studies = load_questions_and_case_studies(st.session_state.image_dir)
+        if 'quiz' not in st.session_state:
+            st.session_state.quiz = Quiz.load_progress(questions, case_studies, user.user_id, "study")
+        algorithm_performance_page(st.session_state.quiz)
     else:
         questions, case_studies = load_questions_and_case_studies(st.session_state.image_dir)
         if not questions:

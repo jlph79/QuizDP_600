@@ -1,6 +1,6 @@
-# DP-600 Quiz Application (v0.1)
+# DP-600 Quiz Application (v0.2)
 
-This Streamlit-based application is designed to help users prepare for the DP-600 certification exam. It offers both study and exam practice modes, along with customizable settings.
+This Streamlit-based application is designed to help users prepare for the DP-600 certification exam. It offers both study and exam practice modes, along with customizable settings and an intelligent question selection algorithm.
 
 ## Project Structure
 
@@ -9,7 +9,7 @@ The application is divided into several Python files, each responsible for speci
 1. `main.py`: The entry point of the application.
 2. `config.py`: Handles user-specific configurations.
 3. `user.py`: Manages user authentication and registration.
-4. `quiz.py`: Core quiz logic and progress tracking.
+4. `quiz.py`: Core quiz logic, progress tracking, and intelligent question selection.
 5. `question.py`: Represents individual quiz questions.
 6. `case_study.py`: Represents case studies associated with questions.
 7. `exam_session.py`: Manages individual exam attempts.
@@ -68,14 +68,49 @@ DP-600_Quiz_App/
 - Progress saving and loading
 - Support for multiple question types (multiple-choice, hotspot, drag-and-drop)
 - Case study support
+- Intelligent question selection algorithm
+- Algorithm performance tracking and reset functionality
+
+## Intelligent Question Selection Algorithm
+
+The application now features an intelligent question selection algorithm that ensures users are exposed to all available questions over time. Here's how it works:
+
+1. Question Tracking:
+   - The algorithm keeps track of how many times each question has been practiced.
+   - It also tracks incorrect answers and questions marked for review.
+
+2. Selection Priority:
+   - Unpracticed questions (50% priority)
+   - Least practiced questions (30% priority)
+   - Incorrect questions (10% priority)
+   - Questions marked for review (10% priority)
+
+3. Performance Metrics:
+   - Total questions presented: The total number of questions shown to the user across all sessions.
+   - Unique questions presented: The number of distinct questions the user has seen.
+   - Questions until full coverage: The number of questions it took to cover all available questions at least once.
+
+4. Algorithm Reset:
+   - Users can reset the algorithm, which clears all tracking data and starts the learning process from scratch.
+
+## Algorithm Performance Page
+
+A new "Algorithm Performance" page has been added to the application. Here, users can:
+
+1. View current algorithm performance stats.
+2. Reset the algorithm to start fresh.
+
+To access this page:
+1. Log in to the application.
+2. Select "Algorithm Performance" from the app mode dropdown in the sidebar.
 
 ## Database
 
-The application uses SQLite for data persistence. The database file `quiz_app.db` will be created in the same directory as the application files.
+The application uses SQLite for data persistence. The database file `quiz_app.db` will be created in the same directory as the application files. The database schema has been updated to include algorithm performance tracking.
 
 ## Configuration
 
-User-specific settings are stored in the database and can be modified through the Configuration page in the application.
+User-specific settings are stored in the database and can be modified through the Configuration page in the application. The number of questions per exam practice session can still be configured here.
 
 ## Known Issues and Limitations
 
@@ -89,7 +124,7 @@ User-specific settings are stored in the database and can be modified through th
 - Add an admin interface for managing questions and users
 - Improve the UI/UX with more interactive elements
 - Implement more sophisticated question types
-- Add detailed analytics and performance tracking for users
+- Enhance the algorithm with machine learning capabilities for personalized question selection
 
 ## Contributing
 

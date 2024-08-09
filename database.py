@@ -33,6 +33,7 @@ def setup_database():
                 practiced_questions TEXT,
                 incorrect_answers TEXT,
                 review_list TEXT,
+                algorithm_performance TEXT,
                 PRIMARY KEY (user_id, mode),
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
@@ -49,6 +50,7 @@ def setup_database():
                 practiced_questions TEXT,
                 incorrect_answers TEXT,
                 review_list TEXT,
+                algorithm_performance TEXT,
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
@@ -76,6 +78,8 @@ def migrate_database():
             cursor.execute("ALTER TABLE user_progress ADD COLUMN incorrect_answers TEXT")
         if 'review_list' not in columns:
             cursor.execute("ALTER TABLE user_progress ADD COLUMN review_list TEXT")
+        if 'algorithm_performance' not in columns:
+            cursor.execute("ALTER TABLE user_progress ADD COLUMN algorithm_performance TEXT")
         
         # Check if columns exist in exam_sessions table
         cursor.execute("PRAGMA table_info(exam_sessions)")
@@ -87,6 +91,8 @@ def migrate_database():
             cursor.execute("ALTER TABLE exam_sessions ADD COLUMN incorrect_answers TEXT")
         if 'review_list' not in columns:
             cursor.execute("ALTER TABLE exam_sessions ADD COLUMN review_list TEXT")
+        if 'algorithm_performance' not in columns:
+            cursor.execute("ALTER TABLE exam_sessions ADD COLUMN algorithm_performance TEXT")
 
 # Call both functions
 setup_database()

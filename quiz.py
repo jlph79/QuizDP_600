@@ -18,9 +18,14 @@ class Quiz:
         self.score: int = 0
         self.user_answers: Dict[str, Union[List[str], None]] = {}
         self.exam_session: Optional[ExamSession] = None
-        self.practiced_questions: Set[str] = set()
+        self.practiced_questions: Dict[str, int] = {}  # Question ID to practice count
         self.incorrect_answers: Set[str] = set()
         self.review_list: Set[str] = set()
+        self.algorithm_performance: Dict[str, int] = {
+            'total_questions_presented': 0,
+            'unique_questions_presented': 0,
+            'questions_until_full_coverage': 0
+        }
 
     def start_exam(self, config):
         selected_questions = self._select_questions(config.exam_questions)
@@ -32,7 +37,7 @@ class Quiz:
             score=0,
             total_questions=len(self.questions),
             is_completed=False,
-            practiced_questions=list(self.practiced_questions),
+            practiced_questions=json.dumps(self.practiced_questions),
             incorrect_answers=list(self.incorrect_answers),
             review_list=list(self.review_list)
         )
@@ -40,28 +45,39 @@ class Quiz:
 
     def _select_questions(self, num_questions: int) -> List[Question]:
         all_questions = set(self.questions)
-        new_questions = all_questions - self.practiced_questions
-        incorrect_questions = all_questions.intersection(self.incorrect_answers)
-        review_questions = all_questions.intersection(self.review_list)
+        unpracticed_questions = all_questions - set(self.practiced_questions.keys())
+        least_practiced_questions = sorted(self.practiced_questions.items(), key=lambda x: x[1])
         
         selected = []
         
-        # Add new questions (40%)
-        new_count = min(int(num_questions * 0.4), len(new_questions))
-        selected.extend(random.sample(list(new_questions), new_count))
+        # Prioritize unpracticed questions (50%)
+        unpracticed_count = min(int(num_questions * 0.5), len(unpracticed_questions))
+        selected.extend(random.sample(list(unpracticed_questions), unpracticed_count))
         
-        # Add incorrect questions (30%)
-        incorrect_count = min(int(num_questions * 0.3), len(incorrect_questions))
+        # Add least practiced questions (30%)
+        least_practiced_count = min(int(num_questions * 0.3), len(least_practiced_questions))
+        selected.extend([self.get_question_by_id(q[0]) for q in least_practiced_questions[:least_practiced_count]])
+        
+        # Add incorrect questions (10%)
+        incorrect_questions = all_questions.intersection(self.incorrect_answers)
+        incorrect_count = min(int(num_questions * 0.1), len(incorrect_questions))
         selected.extend(random.sample(list(incorrect_questions), incorrect_count))
         
-        # Add review questions (20%)
-        review_count = min(int(num_questions * 0.2), len(review_questions))
+        # Add review questions (10%)
+        review_questions = all_questions.intersection(self.review_list)
+        review_count = min(int(num_questions * 0.1), len(review_questions))
         selected.extend(random.sample(list(review_questions), review_count))
         
         # Fill the rest with random questions
         remaining_count = num_questions - len(selected)
         remaining_questions = list(all_questions - set(selected))
         selected.extend(random.sample(remaining_questions, remaining_count))
+        
+        # Update algorithm performance metrics
+        self.algorithm_performance['total_questions_presented'] += len(selected)
+        self.algorithm_performance['unique_questions_presented'] = len(set(self.practiced_questions.keys()).union(set(q.id for q in selected)))
+        if len(set(self.practiced_questions.keys()).union(set(q.id for q in selected))) == len(all_questions):
+            self.algorithm_performance['questions_until_full_coverage'] = self.algorithm_performance['total_questions_presented']
         
         return selected
 
@@ -106,7 +122,7 @@ class Quiz:
         else:
             self.incorrect_answers.add(current_question.id)
         
-        self.practiced_questions.add(current_question.id)
+        self.practiced_questions[current_question.id] = self.practiced_questions.get(current_question.id, 0) + 1
         self.user_answers[current_question.id] = user_answers
         self.save_progress()
         return is_correct
@@ -130,11 +146,11 @@ class Quiz:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO user_progress 
-                (user_id, current_index, score, user_answers, mode, practiced_questions, incorrect_answers, review_list) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (user_id, current_index, score, user_answers, mode, practiced_questions, incorrect_answers, review_list, algorithm_performance) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (self.user_id, self.current_index, self.score, json.dumps(self.user_answers), self.mode,
-                  json.dumps(list(self.practiced_questions)), json.dumps(list(self.incorrect_answers)),
-                  json.dumps(list(self.review_list))))
+                  json.dumps(self.practiced_questions), json.dumps(list(self.incorrect_answers)),
+                  json.dumps(list(self.review_list)), json.dumps(self.algorithm_performance)))
 
     @classmethod
     def load_progress(cls, questions, case_studies, user_id, mode):
@@ -154,12 +170,36 @@ class Quiz:
                     quiz.score = int(progress[3]) if progress[3] else 0
                 try:
                     quiz.user_answers = json.loads(progress[4]) if progress[4] else {}
-                    quiz.practiced_questions = set(json.loads(progress[5])) if progress[5] else set()
+                    quiz.practiced_questions = json.loads(progress[5]) if progress[5] else {}
                     quiz.incorrect_answers = set(json.loads(progress[6])) if progress[6] else set()
                     quiz.review_list = set(json.loads(progress[7])) if progress[7] else set()
+                    quiz.algorithm_performance = json.loads(progress[8]) if progress[8] else {
+                        'total_questions_presented': 0,
+                        'unique_questions_presented': 0,
+                        'questions_until_full_coverage': 0
+                    }
                 except json.JSONDecodeError:
                     quiz.user_answers = {}
-                    quiz.practiced_questions = set()
+                    quiz.practiced_questions = {}
                     quiz.incorrect_answers = set()
                     quiz.review_list = set()
+                    quiz.algorithm_performance = {
+                        'total_questions_presented': 0,
+                        'unique_questions_presented': 0,
+                        'questions_until_full_coverage': 0
+                    }
         return quiz
+
+    def reset_tracking(self):
+        self.practiced_questions = {}
+        self.incorrect_answers = set()
+        self.review_list = set()
+        self.algorithm_performance = {
+            'total_questions_presented': 0,
+            'unique_questions_presented': 0,
+            'questions_until_full_coverage': 0
+        }
+        self.save_progress()
+
+    def get_algorithm_performance(self):
+        return self.algorithm_performance
