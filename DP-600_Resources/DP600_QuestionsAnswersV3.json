@@ -1871,7 +1871,7 @@
     {
       "id": "#109",
       "case_study_id": null,
-      "question_context": "You have a Fabric tenant that contains a semantic model named Model1.\n\nYou discover that the following query performs slowly against Model1.\n![112_Image_0.Png](108_Image_0.Png)\n\nYou need to reduce the execution time of the query.\n\nSolution: You replace line 4 by using the following code:\n\n```CALCULATE ( COUNTROWS ( 'Order Item' ) ) >= 0```",
+      "question_context": "You have a Fabric tenant that contains a semantic model named Model1.\n\nYou discover that the following query performs slowly against Model1.\n![108_Image_0.Png](108_Image_0.Png)\n\nYou need to reduce the execution time of the query.\n\nSolution: You replace line 4 by using the following code:\n\n```CALCULATE ( COUNTROWS ( 'Order Item' ) ) >= 0```",
       "question_text": "Does this meet the goal?",
       "question_type": "single-choice",
       "choices": [
