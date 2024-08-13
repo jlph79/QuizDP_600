@@ -46,10 +46,6 @@ def display_exam_start_page(quiz: Quiz, config: Config):
         st.session_state.exam_started = True
         st.session_state.exam_start_time = datetime.now()
         st.session_state.exam_end_time = datetime.now() + timedelta(minutes=config.exam_duration)
-        # Reset quiz state when starting a new exam
-        quiz.current_index = 0
-        quiz.score = 0
-        quiz.user_answers = {}
         st.experimental_rerun()
 
 def display_exam_in_progress(quiz: Quiz, config: Config):

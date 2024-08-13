@@ -28,6 +28,7 @@ class Quiz:
         }
 
     def start_exam(self, config):
+        self.load_progress()  # Load progress before selecting questions
         selected_questions = self._select_questions(config.exam_questions)
         self.questions = selected_questions
         self.exam_session = ExamSession(
@@ -42,6 +43,7 @@ class Quiz:
             review_list=list(self.review_list)
         )
         self.exam_session.save()
+        self.save_progress()  # Save progress after starting the exam
 
     def _select_questions(self, num_questions: int) -> List[Question]:
         all_questions = set(self.questions)
@@ -75,11 +77,11 @@ class Quiz:
         
         # Update algorithm performance metrics
         self.algorithm_performance['total_questions_presented'] += len(selected)
-        self.algorithm_performance['unique_questions_presented'] = len(set(self.practiced_questions.keys()).union(set(q.id for q in selected)))
-        if len(set(self.practiced_questions.keys()).union(set(q.id for q in selected))) == len(all_questions):
+        self.algorithm_performance['unique_questions_presented'] = len(set(self.practiced_questions.keys()).union(set(q.id for q in selected if q is not None)))
+        if len(set(self.practiced_questions.keys()).union(set(q.id for q in selected if q is not None))) == len(all_questions):
             self.algorithm_performance['questions_until_full_coverage'] = self.algorithm_performance['total_questions_presented']
         
-        return selected
+        return [q for q in selected if q is not None]  # Filter out any None values
 
     def pause_exam(self):
         if self.exam_session:
@@ -97,6 +99,7 @@ class Quiz:
             self.exam_session.score = self.score
             self.exam_session.is_completed = True
             self.exam_session.update()
+        self.save_progress()  # Save progress after finishing the exam
 
     def get_current_question(self) -> Question:
         return self.questions[self.current_index]
@@ -148,43 +151,40 @@ class Quiz:
                   json.dumps(self.practiced_questions), json.dumps(list(self.incorrect_answers)),
                   json.dumps(list(self.review_list)), json.dumps(self.algorithm_performance)))
 
-    @classmethod
-    def load_progress(cls, questions, case_studies, user_id, mode):
-        quiz = cls(questions, case_studies, user_id, mode)
+    def load_progress(self):
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM user_progress WHERE user_id = ? AND mode = ?', (user_id, mode))
+            cursor.execute('SELECT * FROM user_progress WHERE user_id = ? AND mode = ?', (self.user_id, self.mode))
             progress = cursor.fetchone()
             if progress:
-                quiz.current_index = int(progress[2]) if progress[2] and not isinstance(progress[2], dict) else 0
+                self.current_index = int(progress[2]) if progress[2] and not isinstance(progress[2], dict) else 0
                 if progress[3] and isinstance(progress[3], str):
                     try:
-                        quiz.score = len(json.loads(progress[3]))
+                        self.score = len(json.loads(progress[3]))
                     except json.JSONDecodeError:
-                        quiz.score = 0
+                        self.score = 0
                 else:
-                    quiz.score = int(progress[3]) if progress[3] else 0
+                    self.score = int(progress[3]) if progress[3] else 0
                 try:
-                    quiz.user_answers = json.loads(progress[4]) if progress[4] else {}
-                    quiz.practiced_questions = json.loads(progress[5]) if progress[5] else {}
-                    quiz.incorrect_answers = set(json.loads(progress[6])) if progress[6] else set()
-                    quiz.review_list = set(json.loads(progress[7])) if progress[7] else set()
-                    quiz.algorithm_performance = json.loads(progress[8]) if progress[8] else {
+                    self.user_answers = json.loads(progress[4]) if progress[4] else {}
+                    self.practiced_questions = json.loads(progress[5]) if progress[5] else {}
+                    self.incorrect_answers = set(json.loads(progress[6])) if progress[6] else set()
+                    self.review_list = set(json.loads(progress[7])) if progress[7] else set()
+                    self.algorithm_performance = json.loads(progress[8]) if progress[8] else {
                         'total_questions_presented': 0,
                         'unique_questions_presented': 0,
                         'questions_until_full_coverage': 0
                     }
                 except json.JSONDecodeError:
-                    quiz.user_answers = {}
-                    quiz.practiced_questions = {}
-                    quiz.incorrect_answers = set()
-                    quiz.review_list = set()
-                    quiz.algorithm_performance = {
+                    self.user_answers = {}
+                    self.practiced_questions = {}
+                    self.incorrect_answers = set()
+                    self.review_list = set()
+                    self.algorithm_performance = {
                         'total_questions_presented': 0,
                         'unique_questions_presented': 0,
                         'questions_until_full_coverage': 0
                     }
-        return quiz
 
     def reset_tracking(self):
         self.practiced_questions = {}

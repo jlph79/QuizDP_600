@@ -64,7 +64,8 @@ def main():
         question_id = query_params["question_id"][0]
         questions, case_studies = load_questions_and_case_studies(st.session_state.image_dir)
         if 'quiz' not in st.session_state:
-            st.session_state.quiz = Quiz.load_progress(questions, case_studies, user.user_id, "study")
+            st.session_state.quiz = Quiz(questions, case_studies, user.user_id, "study")
+            st.session_state.quiz.load_progress()
         study_specific_question(st.session_state.quiz, config, question_id)
         return
 
@@ -75,7 +76,8 @@ def main():
     elif app_mode == "Algorithm Performance":
         questions, case_studies = load_questions_and_case_studies(st.session_state.image_dir)
         if 'quiz' not in st.session_state:
-            st.session_state.quiz = Quiz.load_progress(questions, case_studies, user.user_id, "study")
+            st.session_state.quiz = Quiz(questions, case_studies, user.user_id, "study")
+            st.session_state.quiz.load_progress()
         algorithm_performance_page(st.session_state.quiz)
     else:
         questions, case_studies = load_questions_and_case_studies(st.session_state.image_dir)
@@ -84,7 +86,8 @@ def main():
             return
 
         if 'quiz' not in st.session_state or st.session_state.quiz.mode != app_mode.lower():
-            st.session_state.quiz = Quiz.load_progress(questions, case_studies, user.user_id, app_mode.lower())
+            st.session_state.quiz = Quiz(questions, case_studies, user.user_id, app_mode.lower())
+            st.session_state.quiz.load_progress()
         
         quiz = st.session_state.quiz
 
