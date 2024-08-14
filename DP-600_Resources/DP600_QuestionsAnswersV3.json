@@ -896,7 +896,7 @@
     {
       "id": "#51",
       "case_study_id": null,
-      "question_context": "You are analyzing customer purchases in a Fabric notebook by using PySpark.\n\nYou have the following DataFrames:\n\n- transactions: Contains five columns named transaction_id, customer_id, product_id, amount, and date and has 10 million rows, with each row representing a transaction.\n- customers: Contains customer details in 1,000 rows and three columns named customer_id, name, and country.\n\nYou need to join the DataFrames on the customer_id column. The solution must minimize data shuffling.\n\nYou write the following code.\n\n ```from pyspark.sql import functions as F\n\nresults = ```\n\nWhich code should you run to populate the results DataFrame?",
+      "question_context": "You are analyzing customer purchases in a Fabric notebook by using PySpark.\n\nYou have the following DataFrames:\n\n- transactions: Contains five columns named transaction_id, customer_id, product_id, amount, and date and has 10 million rows, with each row representing a transaction.\n- customers: Contains customer details in 1,000 rows and three columns named customer_id, name, and country.\n\nYou need to join the DataFrames on the customer_id column. The solution must minimize data shuffling.\n\nYou write the following code.\n\n ```\n\n from pyspark.sql import functions as F\n\nresults = \n\n ```\n\nWhich code should you run to populate the results DataFrame?",
       "question_text": "Which code should you run to populate the results DataFrame?",
       "question_type": "single-choice",
       "choices": [
