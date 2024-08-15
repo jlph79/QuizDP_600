@@ -1857,7 +1857,7 @@
     {
       "id": "#108",
       "case_study_id": null,
-      "question_context": "You have a Fabric tenant that contains a semantic model named Model1.\n\nYou discover that the following query performs slowly against Model1.\n\n![108_Image_00.png](108_Image_00.png)\n\nYou need to reduce the execution time of the query.\n\nSolution: You replace line 4 by using the following code:\n\n```NOT ISEMPTY ( CALCULATETABLE ( 'Order Item ' ) )```",
+      "question_context": "You have a Fabric tenant that contains a semantic model named Model1.\n\nYou discover that the following query performs slowly against Model1.\n\n![108_image_00.png](108_image_00.png)\n\nYou need to reduce the execution time of the query.\n\nSolution: You replace line 4 by using the following code:\n\n```NOT ISEMPTY ( CALCULATETABLE ( 'Order Item ' ) )```",
       "question_text": "Does this meet the goal?",
       "question_type": "single-choice",
       "choices": [
