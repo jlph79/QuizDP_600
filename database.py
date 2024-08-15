@@ -4,12 +4,19 @@ from psycopg2.extras import RealDictCursor
 import json
 import base64
 import logging
-
+import os 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_URL = "postgresql://postgres:AkxzbtDGKXDcLzsSEPwEdgUVxiCRDwXj@viaduct.proxy.rlwy.net:20628/railway"
+# Load the database URL from an environment variable
+PASSWORD = os.getenv("PASSWORD")
+if PASSWORD is None:
+    raise ValueError("PASSWORD environment variable not set.")
+DB_URL = f"postgresql://postgres:{PASSWORD}@viaduct.proxy.rlwy.net:20628/railway"
 
+if DB_URL is None:
+    raise ValueError("DATABASE_URL environment variable not set.")
+    
 def get_connection():
     return psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
 
