@@ -1,9 +1,11 @@
-import sqlite3
 import json
 import streamlit as st
-from database import DB_PATH
+from database import get_connection
 import secrets
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 class User:
     def __init__(self, username, password, user_id=None):
@@ -12,73 +14,89 @@ class User:
         self.user_id = user_id
 
     def save(self):
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute('INSERT OR REPLACE INTO users (username, password) VALUES (?, ?)', (self.username, self.password))
-            self.user_id = cursor.lastrowid
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('INSERT INTO users (username, password) VALUES (%s, %s) RETURNING id', (self.username, self.password))
+                result = cursor.fetchone()
+                self.user_id = result['id'] if isinstance(result, dict) else result[0]
         return self.user_id
 
     @classmethod
     def authenticate(cls, username, password):
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password))
-            user_data = cursor.fetchone()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT * FROM users WHERE username = %s AND password = %s', (username, password))
+                user_data = cursor.fetchone()
         if user_data:
-            return cls(username, password, user_id=user_data[0])
+            logger.info(f"User data retrieved: {user_data}")
+            if isinstance(user_data, dict):
+                return cls(username, password, user_id=user_data['id'])
+            elif isinstance(user_data, (tuple, list)):
+                return cls(username, password, user_id=user_data[0])
+            else:
+                logger.error(f"Unexpected user_data format: {type(user_data)}")
+                return None
+        logger.warning(f"Authentication failed for username: {username}")
         return None
 
     def get_practiced_questions(self, mode):
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT practiced_questions FROM user_progress WHERE user_id = ? AND mode = ?', (self.user_id, mode))
-            result = cursor.fetchone()
-        return json.loads(result[0]) if result and result[0] else []
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT practiced_questions FROM user_progress WHERE user_id = %s AND mode = %s', (self.user_id, mode))
+                result = cursor.fetchone()
+        return json.loads(result['practiced_questions']) if result and result['practiced_questions'] else []
 
     def get_incorrect_answers(self, mode):
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT incorrect_answers FROM user_progress WHERE user_id = ? AND mode = ?', (self.user_id, mode))
-            result = cursor.fetchone()
-        return json.loads(result[0]) if result and result[0] else []
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT incorrect_answers FROM user_progress WHERE user_id = %s AND mode = %s', (self.user_id, mode))
+                result = cursor.fetchone()
+        return json.loads(result['incorrect_answers']) if result and result['incorrect_answers'] else []
 
     def get_review_list(self, mode):
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT review_list FROM user_progress WHERE user_id = ? AND mode = ?', (self.user_id, mode))
-            result = cursor.fetchone()
-        return json.loads(result[0]) if result and result[0] else []
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT review_list FROM user_progress WHERE user_id = %s AND mode = %s', (self.user_id, mode))
+                result = cursor.fetchone()
+        return json.loads(result['review_list']) if result and result['review_list'] else []
 
     def update_progress(self, mode, practiced_questions, incorrect_answers, review_list):
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT OR REPLACE INTO user_progress 
-                (user_id, mode, practiced_questions, incorrect_answers, review_list) 
-                VALUES (?, ?, ?, ?, ?)
-            ''', (self.user_id, mode, json.dumps(practiced_questions), json.dumps(incorrect_answers), json.dumps(review_list)))
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('''
+                    INSERT INTO user_progress 
+                    (user_id, mode, practiced_questions, incorrect_answers, review_list) 
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id, mode) DO UPDATE
+                    SET practiced_questions = EXCLUDED.practiced_questions,
+                        incorrect_answers = EXCLUDED.incorrect_answers,
+                        review_list = EXCLUDED.review_list
+                ''', (self.user_id, mode, json.dumps(practiced_questions), json.dumps(incorrect_answers), json.dumps(review_list)))
 
     def generate_temp_token(self):
         token = secrets.token_urlsafe(32)
         expiration = int(time.time()) + 3600  # Token valid for 1 hour
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute('INSERT INTO temp_tokens (user_id, token, expiration) VALUES (?, ?, ?)',
-                           (self.user_id, token, expiration))
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('INSERT INTO temp_tokens (user_id, token, expiration) VALUES (%s, %s, %s)',
+                               (self.user_id, token, expiration))
         return token
 
 def get_user_by_token(token):
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT user_id FROM temp_tokens WHERE token = ? AND expiration > ?',
-                       (token, int(time.time())))
-        result = cursor.fetchone()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute('SELECT user_id FROM temp_tokens WHERE token = %s AND expiration > %s',
+                           (token, int(time.time())))
+            result = cursor.fetchone()
     if result:
-        user_id = result[0]
-        cursor.execute('SELECT username, password FROM users WHERE id = ?', (user_id,))
-        user_data = cursor.fetchone()
+        user_id = result['user_id'] if isinstance(result, dict) else result[0]
+        with conn.cursor() as cursor:
+            cursor.execute('SELECT username, password FROM users WHERE id = %s', (user_id,))
+            user_data = cursor.fetchone()
         if user_data:
-            return User(user_data[0], user_data[1], user_id=user_id)
+            return User(user_data['username'] if isinstance(user_data, dict) else user_data[0],
+                        user_data['password'] if isinstance(user_data, dict) else user_data[1],
+                        user_id=user_id)
     return None
 
 def login_page():

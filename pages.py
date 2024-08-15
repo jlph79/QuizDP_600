@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 from quiz import Quiz
 from config import Config
+from database import get_connection
 
 def reset_exam_state():
     st.session_state.exam_started = False
@@ -121,7 +122,7 @@ def display_exam_in_progress(quiz: Quiz, config: Config):
 
 def display_exam_finished(quiz: Quiz, config: Config):
     st.header("Exam Finished")
-    st.write(f"Your score: {quiz.score}/{len(quiz.questions)}")
+    st.write(f"Your score: {quiz.score}/{len(quiz.current_exam_questions)}")
     
     if st.button("Start New Exam"):
         reset_exam_state()
@@ -184,7 +185,8 @@ def display_question(quiz: Quiz, config: Config):
             else:
                 st.warning("Please select an answer before submitting.")
     
-    st.markdown(f"<p style='font-size:{config.body_font_size}px;'>Current Score: {quiz.score}/{len(quiz.questions)}</p>", unsafe_allow_html=True)
+    questions = quiz.current_exam_questions if quiz.mode == "exam" else quiz.all_questions
+    st.markdown(f"<p style='font-size:{config.body_font_size}px;'>Current Score: {quiz.score}/{len(questions)}</p>", unsafe_allow_html=True)
     
     # Navigation
     col1, col2, col3 = st.columns(3)
@@ -193,12 +195,12 @@ def display_question(quiz: Quiz, config: Config):
             quiz.go_to_question(quiz.current_index - 1)
             st.experimental_rerun()
     with col2:
-        go_to_page = st.number_input("Go to question", min_value=1, max_value=len(quiz.questions), value=quiz.current_index + 1, key=f"goto_{current_question.id}")
+        go_to_page = st.number_input("Go to question", min_value=1, max_value=len(questions), value=quiz.current_index + 1, key=f"goto_{current_question.id}")
         if st.button("Go", key=f"go_{current_question.id}"):
             quiz.go_to_question(go_to_page - 1)
             st.experimental_rerun()
     with col3:
-        if st.button("Next", key=f"next_{current_question.id}", disabled=quiz.current_index == len(quiz.questions) - 1):
+        if st.button("Next", key=f"next_{current_question.id}", disabled=quiz.current_index == len(questions) - 1):
             quiz.go_to_question(quiz.current_index + 1)
             st.experimental_rerun()
 
@@ -294,3 +296,54 @@ def study_specific_question(quiz: Quiz, config: Config, question_id: str):
             </script>
             """
             st.components.v1.html(js_code, height=0)
+
+def algorithm_performance_page(user_id: int, config: Config):
+    st.title("Algorithm Performance")
+
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute('''
+                SELECT * FROM algorithm_performance 
+                WHERE user_id = %s 
+                ORDER BY timestamp DESC 
+                LIMIT 10
+            ''', (user_id,))
+            records = cursor.fetchall()
+
+    if records:
+        st.write("Latest Algorithm Performance Records:")
+        for record in records:
+            st.markdown(f"""
+            **Timestamp:** {record['timestamp']}
+            - Total Questions Presented: {record['total_questions_presented']}
+            - Unique Questions Presented: {record['unique_questions_presented']}
+            - Questions Until Full Coverage: {record['questions_until_full_coverage']}
+            ---
+            """)
+    else:
+        st.write("No algorithm performance records found.")
+
+    # Calculate and display overall statistics
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute('''
+                SELECT 
+                    AVG(total_questions_presented) as avg_total,
+                    AVG(unique_questions_presented) as avg_unique,
+                    AVG(questions_until_full_coverage) as avg_full_coverage,
+                    MIN(questions_until_full_coverage) as min_full_coverage,
+                    MAX(questions_until_full_coverage) as max_full_coverage
+                FROM algorithm_performance 
+                WHERE user_id = %s
+            ''', (user_id,))
+            stats = cursor.fetchone()
+
+    if stats:
+        st.subheader("Overall Statistics")
+        st.write(f"Average Total Questions Presented: {stats['avg_total']:.2f}")
+        st.write(f"Average Unique Questions Presented: {stats['avg_unique']:.2f}")
+        st.write(f"Average Questions Until Full Coverage: {stats['avg_full_coverage']:.2f}")
+        st.write(f"Minimum Questions Until Full Coverage: {stats['min_full_coverage']}")
+        st.write(f"Maximum Questions Until Full Coverage: {stats['max_full_coverage']}")
+    else:
+        st.write("No overall statistics available.")

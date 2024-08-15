@@ -7,7 +7,7 @@ import base64
 
 class Question:
     def __init__(self, data):
-        self.id = data['id'].lstrip('#')
+        self.id = int(str(data['id']).lstrip('#'))  # Convert to int after stripping '#' if present
         self.context = data.get('question_context', '')
         self.text = data['question_text']
         self.type = data['question_type']
