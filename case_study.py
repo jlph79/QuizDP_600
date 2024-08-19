@@ -46,3 +46,16 @@ class CaseStudy:
                         st.markdown(self._render_markdown(f"- {item}"), unsafe_allow_html=True)
                 else:
                     st.markdown(self._render_markdown(value), unsafe_allow_html=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'overview': self.overview,
+            'existing_environment': self.existing_environment,
+            'requirements': self.requirements,
+            'image_dir': self.image_dir
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data, data['image_dir'])

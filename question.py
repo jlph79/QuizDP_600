@@ -7,7 +7,7 @@ import base64
 
 class Question:
     def __init__(self, data):
-        self.id = data['id'].lstrip('#')
+        self.id = int(str(data['id']).lstrip('#'))  # Convert to int after stripping '#' if present
         self.context = data.get('question_context', '')
         self.text = data['question_text']
         self.type = data['question_type']
@@ -101,3 +101,19 @@ class Question:
             user_answer_set = set(user_answers)
             return user_answer_set == correct_answers
         return False
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'question_context': self.context,
+            'question_text': self.text,
+            'question_type': self.type,
+            'choices': self.choices,
+            'correct_answers': self.correct_answers,
+            'correct_answers_community': self.correct_answers_community,
+            'case_study_id': self.case_study_id
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data)
