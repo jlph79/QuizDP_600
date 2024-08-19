@@ -15,7 +15,8 @@ logger.setLevel(logging.DEBUG)  # Set logging level to DEBUG for more detailed l
 class Quiz:
     def __init__(self, questions: List[Question], case_studies: Dict[str, CaseStudy], user_id: int, mode: str = "study"):
         self.all_questions: List[Question] = questions
-        self.current_exam_questions: List[Question] = []
+        self.study_questions: List[Question] = questions.copy()
+        self.exam_practice_questions: List[Question] = []
         self.case_studies: Dict[str, CaseStudy] = case_studies
         self.user_id: int = user_id
         self.mode: str = mode
@@ -32,16 +33,19 @@ class Quiz:
             'questions_until_full_coverage': 0
         }
         self.load_progress()
-        logger.info(f"Quiz initialized. Mode: {self.mode}, Current exam questions: {len(self.current_exam_questions)}")
+        self.set_mode(self.mode)  # Ensure correct initialization based on mode
+        logger.info(f"Quiz initialized. Mode: {self.mode}, Current questions: {len(self.get_current_question_set())}")
 
     def start_exam(self, config):
-        logger.info(f"Starting exam with config: {config.__dict__}")
-        self.mode = "exam"
+        logger.info(f"Starting new exam with config: {config.__dict__}")
+        self.set_mode("exam practice")
         num_questions = min(config.exam_questions, len(self.all_questions))
-        logger.info(f"Selecting {num_questions} questions for the exam")
-        self.current_exam_questions = self._select_questions(num_questions)
+        logger.info(f"Selecting {num_questions} questions for the new exam")
         
-        if not self.current_exam_questions:
+        # Always select new questions for a new exam
+        self.exam_practice_questions = self._select_questions(num_questions)
+        
+        if not self.exam_practice_questions:
             logger.error("No questions were selected for the exam")
             return False
 
@@ -54,7 +58,7 @@ class Quiz:
             start_time=datetime.now(),
             end_time=None,
             score=0,
-            total_questions=len(self.current_exam_questions),
+            total_questions=len(self.exam_practice_questions),
             is_completed=False,
             practiced_questions=json.dumps(self.practiced_questions),
             incorrect_answers=list(self.incorrect_answers),
@@ -62,11 +66,11 @@ class Quiz:
         )
         self.exam_session.save()
         self.save_progress()
-        logger.info(f"Exam started with {len(self.current_exam_questions)} questions")
+        logger.info(f"New exam started with {len(self.exam_practice_questions)} questions: {[q.id for q in self.exam_practice_questions]}")
         return True
 
     def _select_questions(self, num_questions: int) -> List[Question]:
-        logger.info(f"Selecting {num_questions} questions")
+        logger.info(f"Selecting {num_questions} new questions")
         all_questions = list(self.all_questions)
         logger.info(f"Total questions available: {len(all_questions)}")
         
@@ -76,25 +80,16 @@ class Quiz:
         
         random.shuffle(all_questions)  # Shuffle the questions first
         
-        # Calculate weights for each question based on practice count and correctness
+        # Calculate weights for each question
         weights = []
-        max_practice_count = max(self.practiced_questions.values()) if self.practiced_questions else 1
         for q in all_questions:
             practice_count = self.practiced_questions.get(q.id, 0)
-            is_incorrect = q.id in self.incorrect_answers
-            is_review = q.id in self.review_list
-            
-            # Higher weight for unpracticed, incorrect, and review questions
-            weight = 1.0
             if practice_count == 0:
-                weight *= 2.0
-            elif is_incorrect:
-                weight *= 1.5
-            elif is_review:
-                weight *= 1.25
-            
-            # Decrease weight for frequently practiced questions
-            weight *= (1 - (practice_count / max_practice_count) * 0.5)
+                # Significant boost for unpracticed questions
+                weight = 10.0
+            else:
+                # Reduce weight for practiced questions, but maintain some chance
+                weight = max(0.5, 1 - (practice_count * 0.1))
             
             weights.append(weight)
         
@@ -115,7 +110,7 @@ class Quiz:
             self.algorithm_performance['questions_until_full_coverage'] = self.algorithm_performance['total_questions_presented']
         
         logger.info(f"Algorithm performance after selection: {self.algorithm_performance}")
-        logger.info(f"Selected {len(selected)} questions: {[q.id for q in selected]}")
+        logger.info(f"Selected {len(selected)} new questions: {[q.id for q in selected]}")
         return selected
 
     def pause_exam(self):
@@ -140,15 +135,14 @@ class Quiz:
             self.exam_session.update()
         self.save_progress()
         self.save_algorithm_performance()
-        self.mode = "study"
-        self.current_exam_questions = []
+        self.set_mode("study")
         logger.info(f"Exam finished. Final score: {self.score}")
 
+    def get_current_question_set(self) -> List[Question]:
+        return self.exam_practice_questions if self.mode == "exam practice" else self.study_questions
+
     def get_current_question(self) -> Optional[Question]:
-        logger.info(f"Getting current question. Mode: {self.mode}, Current index: {self.current_index}")
-        logger.info(f"All questions: {len(self.all_questions)}, Current exam questions: {len(self.current_exam_questions)}")
-        
-        questions = self.current_exam_questions if self.mode == "exam" else self.all_questions
+        questions = self.get_current_question_set()
         if questions and 0 <= self.current_index < len(questions):
             return questions[self.current_index]
         logger.warning(f"No question found at index {self.current_index}. Total questions: {len(questions)}")
@@ -183,9 +177,9 @@ class Quiz:
         return is_correct
 
     def go_to_question(self, index: int):
-        questions = self.current_exam_questions if self.mode == "exam" else self.all_questions
+        questions = self.get_current_question_set()
         logger.info(f"Attempting to go to question at index {index}. Current mode: {self.mode}, Total questions: {len(questions)}")
-        logger.info(f"Current exam questions: {[q.id for q in self.current_exam_questions]}")
+        logger.info(f"Current questions: {[q.id for q in questions]}")
         if 0 <= index < len(questions):
             self.current_index = index
             self.save_progress()
@@ -225,63 +219,78 @@ class Quiz:
                     ''', (self.user_id, self.current_index, self.score, json.dumps(self.user_answers), self.mode,
                           json.dumps(self.practiced_questions), json.dumps(list(self.incorrect_answers)),
                           json.dumps(list(self.review_list)), json.dumps(self.algorithm_performance),
-                          json.dumps([q.id for q in self.current_exam_questions])))
-            logger.info(f"Progress saved successfully. Mode: {self.mode}, Current exam questions: {[q.id for q in self.current_exam_questions]}")
+                          json.dumps([q.id for q in self.exam_practice_questions])))
+            logger.info(f"Progress saved successfully. Mode: {self.mode}, Current exam questions: {[q.id for q in self.exam_practice_questions]}")
         except Exception as e:
             logger.error(f"Error saving progress: {str(e)}")
 
     def load_progress(self):
-        logger.info(f"Loading progress for user {self.user_id} in mode {self.mode}")
+        logger.info(f"Loading progress for user {self.user_id}")
         try:
             with get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute('SELECT * FROM user_progress WHERE user_id = %s', (self.user_id,))
                     progress = cursor.fetchone()
                     if progress:
-                        logger.info(f"Progress data fetched: {progress}")
+                        self.mode = progress['mode']
                         self.current_index = progress['current_index'] if progress['current_index'] is not None else 0
                         self.score = progress['score'] if progress['score'] is not None else 0
-                        self.mode = progress['mode']  # Update the mode from the database
-                        try:
-                            self.user_answers = json.loads(progress['user_answers']) if progress['user_answers'] else {}
-                            self.practiced_questions = json.loads(progress['practiced_questions']) if progress['practiced_questions'] else {}
-                            self.incorrect_answers = set(json.loads(progress['incorrect_answers'])) if progress['incorrect_answers'] else set()
-                            self.review_list = set(json.loads(progress['review_list'])) if progress['review_list'] else set()
-                            self.algorithm_performance = json.loads(progress['algorithm_performance']) if progress['algorithm_performance'] else {
-                                'total_questions_presented': 0,
-                                'unique_questions_presented': 0,
-                                'questions_until_full_coverage': 0
-                            }
-                            if progress['current_exam_questions']:
-                                current_exam_question_ids = progress['current_exam_questions']
-                                if isinstance(current_exam_question_ids, str):
-                                    current_exam_question_ids = json.loads(current_exam_question_ids)
-                                elif not isinstance(current_exam_question_ids, list):
-                                    logger.warning(f"Unexpected type for current_exam_questions: {type(current_exam_question_ids)}")
-                                    current_exam_question_ids = []
-                                self.current_exam_questions = [q for q in self.all_questions if q.id in current_exam_question_ids]
-                                logger.info(f"Loaded {len(self.current_exam_questions)} current exam questions: {current_exam_question_ids}")
-                            else:
-                                logger.info("No current exam questions found in progress data")
-                        except json.JSONDecodeError as e:
-                            logger.error(f"JSON decode error: {str(e)}")
-                            logger.error(traceback.format_exc())
-                            self.user_answers = {}
-                            self.practiced_questions = {}
-                            self.incorrect_answers = set()
-                            self.review_list = set()
-                            self.algorithm_performance = {
-                                'total_questions_presented': 0,
-                                'unique_questions_presented': 0,
-                                'questions_until_full_coverage': 0
-                            }
-                            self.current_exam_questions = []
+                        
+                        # Handle current_exam_questions
+                        current_exam_question_ids = progress['current_exam_questions']
+                        if isinstance(current_exam_question_ids, str):
+                            try:
+                                current_exam_question_ids = json.loads(current_exam_question_ids)
+                            except json.JSONDecodeError:
+                                logger.error(f"Failed to decode current_exam_questions: {current_exam_question_ids}")
+                                current_exam_question_ids = []
+                        elif isinstance(current_exam_question_ids, list):
+                            pass  # It's already a list, no need to decode
+                        else:
+                            logger.warning(f"Unexpected type for current_exam_questions: {type(current_exam_question_ids)}")
+                            current_exam_question_ids = []
+                        
+                        self.exam_practice_questions = [q for q in self.all_questions if q.id in current_exam_question_ids]
+                        
+                        # Load other fields
+                        self.user_answers = json.loads(progress['user_answers']) if progress['user_answers'] else {}
+                        self.practiced_questions = json.loads(progress['practiced_questions']) if progress['practiced_questions'] else {}
+                        self.incorrect_answers = set(json.loads(progress['incorrect_answers'])) if progress['incorrect_answers'] else set()
+                        self.review_list = set(json.loads(progress['review_list'])) if progress['review_list'] else set()
+                        self.algorithm_performance = json.loads(progress['algorithm_performance']) if progress['algorithm_performance'] else {
+                            'total_questions_presented': 0,
+                            'unique_questions_presented': 0,
+                            'questions_until_full_coverage': 0
+                        }
+
+                        logger.info(f"Progress loaded. Mode: {self.mode}, Questions: {len(self.get_current_question_set())}")
                     else:
-                        logger.info("No progress data found")
-            logger.info(f"Progress loaded successfully. Mode: {self.mode}, Current exam questions: {[q.id for q in self.current_exam_questions]}")
+                        logger.info("No progress data found, initializing with default values")
+                        self.exam_practice_questions = []
+                        self.user_answers = {}
+                        self.practiced_questions = {}
+                        self.incorrect_answers = set()
+                        self.review_list = set()
+                        self.algorithm_performance = {
+                            'total_questions_presented': 0,
+                            'unique_questions_presented': 0,
+                            'questions_until_full_coverage': 0
+                        }
+            logger.info(f"Progress loading completed. Mode: {self.mode}, Current questions: {len(self.get_current_question_set())}")
         except Exception as e:
             logger.error(f"Error loading progress: {str(e)}")
             logger.error(traceback.format_exc())
+            # Initialize with default values in case of error
+            self.exam_practice_questions = []
+            self.user_answers = {}
+            self.practiced_questions = {}
+            self.incorrect_answers = set()
+            self.review_list = set()
+            self.algorithm_performance = {
+                'total_questions_presented': 0,
+                'unique_questions_presented': 0,
+                'questions_until_full_coverage': 0
+            }
 
     def save_algorithm_performance(self):
         logger.info(f"Saving algorithm performance: {self.algorithm_performance}")
@@ -314,12 +323,36 @@ class Quiz:
         self.save_algorithm_performance()
         logger.info("Tracking reset completed")
 
+    def clear_exam_progress(self):
+        logger.info("Clearing exam progress")
+        self.exam_practice_questions = []
+        self.current_index = 0
+        self.score = 0
+        self.user_answers = {}
+        self.save_progress()
+        logger.info("Exam progress cleared")
+
     def get_algorithm_performance(self):
         return self.algorithm_performance
 
     def get_total_questions(self):
-        return len(self.current_exam_questions) if self.mode == "exam" else len(self.all_questions)
+        return len(self.get_current_question_set())
 
     def get_current_score(self):
         total_questions = self.get_total_questions()
         return f"{self.score}/{total_questions}"
+
+    def set_mode(self, new_mode: str):
+        logger.info(f"Setting mode from {self.mode} to {new_mode}")
+        self.mode = new_mode
+        if new_mode == "study":
+            self.current_index = 0
+        elif new_mode == "exam practice":
+            if not self.exam_practice_questions:
+                self.clear_exam_progress()
+                # Select questions for exam practice mode
+                num_questions = min(20, len(self.all_questions))  # Default to 20 questions or less if not enough questions
+                self.exam_practice_questions = self._select_questions(num_questions)
+            self.current_index = 0
+        self.save_progress()
+        logger.info(f"Mode set to {self.mode}, Current questions: {len(self.get_current_question_set())}")

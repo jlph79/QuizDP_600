@@ -90,6 +90,7 @@ def main():
                 st.error(f"An error occurred while creating the quiz or loading progress: {str(e)}")
                 st.error("Please check the logs for more details.")
                 return
+        st.session_state.quiz.set_mode("study")  # Ensure study mode is set
         study_specific_question(st.session_state.quiz, config, question_id)
         return
 
@@ -100,7 +101,6 @@ def main():
     elif app_mode == "Algorithm Performance":
         if 'quiz' not in st.session_state:
             try:
-                st.session_state.quiz = Quiz(questions, case_studies, user.user_id, "study")
                 st.session_state.quiz.load_progress()
                 logger.info("Quiz created and progress loaded successfully for Algorithm Performance mode.")
             except Exception as e:

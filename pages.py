@@ -34,13 +34,13 @@ def configuration_page(config: Config, user_id: int):
 def exam_practice_mode(quiz: Quiz, config: Config):
     logger.info(f"Entering exam_practice_mode. Current quiz mode: {quiz.mode}")
     logger.info(f"Number of questions in all_questions: {len(quiz.all_questions)}")
-    logger.info(f"Number of questions in current_exam_questions: {len(quiz.current_exam_questions)}")
+    logger.info(f"Number of questions in current question set: {len(quiz.get_current_question_set())}")
     
     if 'exam_started' not in st.session_state:
         reset_exam_state()
 
     if not st.session_state.exam_started and not st.session_state.exam_finished:
-        if quiz.mode == "exam" and len(quiz.current_exam_questions) > 0:
+        if quiz.mode == "exam practice" and len(quiz.get_current_question_set()) > 0:
             st.session_state.exam_started = True
             st.session_state.exam_start_time = datetime.now()
             st.session_state.exam_end_time = datetime.now() + timedelta(minutes=config.exam_duration)
@@ -61,7 +61,7 @@ def display_exam_start_page(quiz: Quiz, config: Config):
             st.session_state.exam_started = True
             st.session_state.exam_start_time = datetime.now()
             st.session_state.exam_end_time = datetime.now() + timedelta(minutes=config.exam_duration)
-            logger.info(f"Exam started. Number of questions: {len(quiz.current_exam_questions)}")
+            logger.info(f"Exam started. Number of questions: {len(quiz.get_current_question_set())}")
             st.experimental_rerun()
         else:
             st.error("Failed to start the exam. Please try again.")
@@ -71,8 +71,8 @@ def display_exam_in_progress(quiz: Quiz, config: Config):
     logger.info(f"Displaying exam in progress. Current index: {quiz.current_index}")
     logger.info(f"Quiz mode: {quiz.mode}")
     logger.info(f"Number of questions in all_questions: {len(quiz.all_questions)}")
-    logger.info(f"Number of questions in current_exam_questions: {len(quiz.current_exam_questions)}")
-    logger.info(f"Current exam questions: {[q.id for q in quiz.current_exam_questions]}")
+    logger.info(f"Number of questions in current question set: {len(quiz.get_current_question_set())}")
+    logger.info(f"Current exam questions: {[q.id for q in quiz.get_current_question_set()]}")
  
     current_question = quiz.get_current_question()
     if current_question is None:
@@ -180,7 +180,7 @@ def study_mode(quiz: Quiz, config: Config):
 def display_question(quiz: Quiz, config: Config):
     logger.info(f"Displaying question. Quiz mode: {quiz.mode}")
     logger.info(f"Number of questions in all_questions: {len(quiz.all_questions)}")
-    logger.info(f"Number of questions in current_exam_questions: {len(quiz.current_exam_questions)}")
+    logger.info(f"Number of questions in current question set: {len(quiz.get_current_question_set())}")
     
     current_question = quiz.get_current_question()
     if current_question is None:
