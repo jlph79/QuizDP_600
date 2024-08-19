@@ -4,6 +4,7 @@ from database import get_connection
 import secrets
 import time
 import logging
+from psycopg2 import IntegrityError
 
 logger = logging.getLogger(__name__)
 
@@ -74,13 +75,22 @@ class User:
                 ''', (self.user_id, mode, json.dumps(practiced_questions), json.dumps(incorrect_answers), json.dumps(review_list)))
 
     def generate_temp_token(self):
-        token = secrets.token_urlsafe(32)
-        expiration = int(time.time()) + 3600  # Token valid for 1 hour
-        with get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute('INSERT INTO temp_tokens (user_id, token, expiration) VALUES (%s, %s, %s)',
-                               (self.user_id, token, expiration))
-        return token
+        max_attempts = 5
+        for attempt in range(max_attempts):
+            token = secrets.token_urlsafe(32)
+            expiration = int(time.time()) + 3600  # Token valid for 1 hour
+            try:
+                with get_connection() as conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute('INSERT INTO temp_tokens (user_id, token, expiration) VALUES (%s, %s, %s)',
+                                       (self.user_id, token, expiration))
+                return token
+            except IntegrityError:
+                if attempt == max_attempts - 1:
+                    logger.error(f"Failed to generate a unique token after {max_attempts} attempts")
+                    raise
+                continue
+        raise Exception("Failed to generate a unique token")
 
 def get_user_by_token(token):
     with get_connection() as conn:

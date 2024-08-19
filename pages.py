@@ -4,6 +4,8 @@ from quiz import Quiz
 from config import Config
 from database import get_connection
 import logging
+import json
+import traceback
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -269,7 +271,32 @@ def display_review_list(quiz: Quiz, config: Config):
             col1, col2 = st.columns([3, 1])
             with col1:
                 if st.button(f"Question {question_id}", key=f"open_{question_id}"):
+                    # Serialize the quiz state
+                    quiz_state = {
+                        'all_questions': [q.to_dict() for q in quiz.all_questions],
+                        'case_studies': {k: v.to_dict() for k, v in quiz.case_studies.items()},
+                        'user_id': quiz.user_id,
+                        'mode': quiz.mode,
+                        'current_index': quiz.current_index,
+                        'score': quiz.score,
+                        'user_answers': quiz.user_answers,
+                        'practiced_questions': quiz.practiced_questions,
+                        'incorrect_answers': list(quiz.incorrect_answers),
+                        'review_list': list(quiz.review_list),
+                        'algorithm_performance': quiz.algorithm_performance
+                    }
+                    # Encode the quiz state as a JSON string
+                    quiz_state_json = json.dumps(quiz_state)
+                    # Generate a temporary token
                     token = st.session_state.user.generate_temp_token()
+                    # Store the quiz state in the database using the token
+                    with get_connection() as conn:
+                        with conn.cursor() as cursor:
+                            cursor.execute(
+                                'INSERT INTO quiz_states (token, state) VALUES (%s, %s) ON CONFLICT (token) DO UPDATE SET state = EXCLUDED.state',
+                                (token, quiz_state_json)
+                            )
+                    # Open a new window with the question
                     js_code = f"""
                     <script>
                     window.open('/?question_id={question_id}&token={token}', '_blank');
@@ -283,8 +310,31 @@ def display_review_list(quiz: Quiz, config: Config):
         st.markdown(f"<p style='font-size:{config.body_font_size}px;'>No questions marked for review.</p>", unsafe_allow_html=True)
 
 def study_specific_question(quiz: Quiz, config: Config, question_id: str):
-    question = quiz.get_question_by_id(question_id)
+    logger.info(f"Attempting to study specific question with ID: {question_id}")
+    logger.info(f"Total questions in quiz: {len(quiz.all_questions)}")
+    logger.info(f"Question IDs in all_questions: {[q.id for q in quiz.all_questions]}")
+    logger.info(f"Quiz mode: {quiz.mode}")
+    logger.info(f"Current index: {quiz.current_index}")
+    
+    # Check if question_id is in the correct format
+    if not isinstance(question_id, str):
+        logger.error(f"Invalid question_id format: {question_id}. Expected string, got {type(question_id)}")
+        st.error(f"Invalid question ID format. Please contact support.")
+        return
+    
+    # Check if the question is in the current question set
+    current_questions = quiz.get_current_question_set()
+    logger.info(f"Current question set size: {len(current_questions)}")
+    logger.info(f"Current question IDs: {[q.id for q in current_questions]}")
+    
+    question = next((q for q in current_questions if q.id == question_id), None)
+    
+    if question is None:
+        logger.warning(f"Question {question_id} not found in current question set. Searching in all questions.")
+        question = quiz.get_question_by_id(question_id)
+    
     if question:
+        logger.info(f"Question found: {question.id}")
         st.markdown(f"<h2 style='font-size:{config.header_font_size}px;'>Studying Question {question_id}</h2>", unsafe_allow_html=True)
         
         # Display case study if available
@@ -339,7 +389,12 @@ def study_specific_question(quiz: Quiz, config: Config, question_id: str):
             """
             st.components.v1.html(js_code, height=0)
     else:
-        st.error("Question not found.")
+        logger.error(f"Question not found for ID: {question_id}")
+        logger.error(f"Available question IDs in all_questions: {[q.id for q in quiz.all_questions]}")
+        logger.error(f"Available question IDs in current set: {[q.id for q in current_questions]}")
+        st.error(f"Question not found. ID: {question_id}")
+        st.error("This could be due to a mismatch between the stored question ID and the actual questions in the quiz.")
+        st.error("Please try refreshing the main page and selecting the question again.")
         if st.button("Close"):
             js_code = """
             <script>

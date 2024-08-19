@@ -83,6 +83,21 @@ def setup_database():
                 else:
                     logger.info("current_exam_questions column already exists in user_progress table.")
 
+            # Check for quiz_states table
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'quiz_states'
+                )
+            """)
+            quiz_states_exist = cursor.fetchone()['exists']
+
+            if not quiz_states_exist:
+                logger.warning("quiz_states table does not exist. Creating it now...")
+                create_quiz_states_table(cursor)
+            else:
+                logger.info("quiz_states table exists.")
+
 def create_questions_table(cursor):
     cursor.execute('''
         CREATE TABLE questions (
@@ -133,6 +148,16 @@ def create_user_progress_table(cursor):
         )
     ''')
     logger.info("user_progress table created successfully.")
+
+def create_quiz_states_table(cursor):
+    cursor.execute('''
+        CREATE TABLE quiz_states (
+            token TEXT PRIMARY KEY,
+            state JSONB NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    logger.info("quiz_states table created successfully.")
 
 def add_current_exam_questions_column(cursor):
     cursor.execute('''

@@ -2,12 +2,15 @@ import streamlit as st
 from config import Config
 from user import User, login_page, get_user_by_token
 from quiz import Quiz
-from database import setup_database
+from database import setup_database, get_connection
 from utils import load_questions_and_case_studies, generate_temp_token
 from pages import configuration_page, exam_practice_mode, study_mode, study_specific_question
 import os
 import logging
 import traceback
+import json
+from question import Question
+from case_study import CaseStudy
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -32,6 +35,28 @@ def algorithm_performance_page(quiz):
         quiz.reset_tracking()
         st.success("Algorithm has been reset to zero.")
         st.experimental_rerun()
+
+def load_quiz_state(token):
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute('SELECT state FROM quiz_states WHERE token = %s', (token,))
+            result = cursor.fetchone()
+    
+    if result:
+        quiz_state = result['state'] if isinstance(result['state'], dict) else json.loads(result['state'])
+        # Reconstruct the Quiz object
+        all_questions = [Question.from_dict(q) for q in quiz_state['all_questions']]
+        case_studies = {k: CaseStudy.from_dict(v) for k, v in quiz_state['case_studies'].items()}
+        quiz = Quiz(all_questions, case_studies, quiz_state['user_id'], quiz_state['mode'])
+        quiz.current_index = quiz_state['current_index']
+        quiz.score = quiz_state['score']
+        quiz.user_answers = quiz_state['user_answers']
+        quiz.practiced_questions = quiz_state['practiced_questions']
+        quiz.incorrect_answers = set(quiz_state['incorrect_answers'])
+        quiz.review_list = set(quiz_state['review_list'])
+        quiz.algorithm_performance = quiz_state['algorithm_performance']
+        return quiz
+    return None
 
 def main():
     logger.info("Starting main application...")
@@ -77,21 +102,14 @@ def main():
     logger.info(f"Case Study IDs: {list(case_studies.keys())}")
 
     # Handle the study_question route
-    if "question_id" in query_params:
+    if "question_id" in query_params and "token" in query_params:
         question_id = query_params["question_id"][0]
-        if 'quiz' not in st.session_state:
-            try:
-                st.session_state.quiz = Quiz(questions, case_studies, user.user_id, "study")
-                st.session_state.quiz.load_progress()
-                logger.info("Quiz created and progress loaded successfully for study_question route.")
-            except Exception as e:
-                logger.error(f"Error creating quiz or loading progress: {str(e)}")
-                logger.error(traceback.format_exc())
-                st.error(f"An error occurred while creating the quiz or loading progress: {str(e)}")
-                st.error("Please check the logs for more details.")
-                return
-        st.session_state.quiz.set_mode("study")  # Ensure study mode is set
-        study_specific_question(st.session_state.quiz, config, question_id)
+        token = query_params["token"][0]
+        quiz = load_quiz_state(token)
+        if quiz:
+            study_specific_question(quiz, config, question_id)
+        else:
+            st.error("Failed to load quiz state. Please try again.")
         return
 
     app_mode = st.sidebar.selectbox("Choose the app mode", ["Study", "Exam Practice", "Configuration", "Algorithm Performance"])
@@ -101,6 +119,7 @@ def main():
     elif app_mode == "Algorithm Performance":
         if 'quiz' not in st.session_state:
             try:
+                st.session_state.quiz = Quiz(questions, case_studies, user.user_id, "study")
                 st.session_state.quiz.load_progress()
                 logger.info("Quiz created and progress loaded successfully for Algorithm Performance mode.")
             except Exception as e:

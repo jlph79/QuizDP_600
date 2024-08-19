@@ -149,9 +149,27 @@ class Quiz:
         return None
 
     def get_question_by_id(self, question_id: str) -> Optional[Question]:
+        logger.info(f"Searching for question with ID: {question_id}")
+        logger.info(f"Type of question_id: {type(question_id)}")
+        
+        # First, try to find the question with exact match
         for question in self.all_questions:
-            if question.id == question_id:
+            if str(question.id) == str(question_id):
+                logger.info(f"Question found: {question.id}")
                 return question
+        
+        # If not found, try to find by converting both to integers
+        try:
+            question_id_int = int(question_id)
+            for question in self.all_questions:
+                if int(question.id) == question_id_int:
+                    logger.info(f"Question found after integer conversion: {question.id}")
+                    return question
+        except ValueError:
+            logger.warning(f"Failed to convert question_id to integer: {question_id}")
+        
+        logger.error(f"Question not found for ID: {question_id}")
+        logger.info(f"Available question IDs: {[q.id for q in self.all_questions]}")
         return None
 
     def check_answer(self, user_answers: Union[List[str], None]) -> bool:
