@@ -3,6 +3,10 @@ from datetime import datetime, timedelta
 from quiz import Quiz
 from config import Config
 from database import get_connection
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def reset_exam_state():
     st.session_state.exam_started = False
@@ -28,11 +32,21 @@ def configuration_page(config: Config, user_id: int):
         st.experimental_rerun()
 
 def exam_practice_mode(quiz: Quiz, config: Config):
+    logger.info(f"Entering exam_practice_mode. Current quiz mode: {quiz.mode}")
+    logger.info(f"Number of questions in all_questions: {len(quiz.all_questions)}")
+    logger.info(f"Number of questions in current_exam_questions: {len(quiz.current_exam_questions)}")
+    
     if 'exam_started' not in st.session_state:
         reset_exam_state()
 
     if not st.session_state.exam_started and not st.session_state.exam_finished:
-        display_exam_start_page(quiz, config)
+        if quiz.mode == "exam" and len(quiz.current_exam_questions) > 0:
+            st.session_state.exam_started = True
+            st.session_state.exam_start_time = datetime.now()
+            st.session_state.exam_end_time = datetime.now() + timedelta(minutes=config.exam_duration)
+            display_exam_in_progress(quiz, config)
+        else:
+            display_exam_start_page(quiz, config)
     elif st.session_state.exam_started:
         display_exam_in_progress(quiz, config)
     else:
@@ -43,13 +57,32 @@ def display_exam_start_page(quiz: Quiz, config: Config):
     st.write(f"Duration: {config.exam_duration} minutes")
     st.write(f"Number of questions: {config.exam_questions}")
     if st.button("Start Exam"):
-        quiz.start_exam(config)
-        st.session_state.exam_started = True
-        st.session_state.exam_start_time = datetime.now()
-        st.session_state.exam_end_time = datetime.now() + timedelta(minutes=config.exam_duration)
-        st.experimental_rerun()
+        if quiz.start_exam(config):
+            st.session_state.exam_started = True
+            st.session_state.exam_start_time = datetime.now()
+            st.session_state.exam_end_time = datetime.now() + timedelta(minutes=config.exam_duration)
+            logger.info(f"Exam started. Number of questions: {len(quiz.current_exam_questions)}")
+            st.experimental_rerun()
+        else:
+            st.error("Failed to start the exam. Please try again.")
+            logger.error("Failed to start exam")
 
 def display_exam_in_progress(quiz: Quiz, config: Config):
+    logger.info(f"Displaying exam in progress. Current index: {quiz.current_index}")
+    logger.info(f"Quiz mode: {quiz.mode}")
+    logger.info(f"Number of questions in all_questions: {len(quiz.all_questions)}")
+    logger.info(f"Number of questions in current_exam_questions: {len(quiz.current_exam_questions)}")
+    logger.info(f"Current exam questions: {[q.id for q in quiz.current_exam_questions]}")
+ 
+    current_question = quiz.get_current_question()
+    if current_question is None:
+        st.error("No questions available for the exam. Please check your configuration and try again.")
+        logger.error("No current question available")
+        if st.button("Return to Start"):
+            reset_exam_state()
+            st.experimental_rerun()
+        return
+
     # Timer display
     timer_placeholder = st.empty()
 
@@ -78,7 +111,6 @@ def display_exam_in_progress(quiz: Quiz, config: Config):
             st.experimental_rerun()
     
     with col3:
-        current_question = quiz.get_current_question()
         if st.button("Mark for Review", key=f"review_{current_question.id}"):
             quiz.mark_for_review(current_question.id)
             st.success(f"Question {current_question.id} marked for review.")
@@ -120,9 +152,19 @@ def display_exam_in_progress(quiz: Quiz, config: Config):
     else:
         st.info("Exam is paused. Click 'Resume Exam' to continue.")
 
+    # Display progress
+    total_questions = quiz.get_total_questions()
+    if total_questions > 0:
+        progress = min(quiz.current_index + 1, total_questions) / total_questions
+        st.progress(progress)
+        st.write(f"Question {quiz.current_index + 1} of {total_questions}")
+        st.write(f"Current Score: {quiz.get_current_score()}")
+    else:
+        st.warning("No questions available for this exam.")
+
 def display_exam_finished(quiz: Quiz, config: Config):
     st.header("Exam Finished")
-    st.write(f"Your score: {quiz.score}/{len(quiz.current_exam_questions)}")
+    st.write(f"Your score: {quiz.get_current_score()}")
     
     if st.button("Start New Exam"):
         reset_exam_state()
@@ -136,11 +178,20 @@ def study_mode(quiz: Quiz, config: Config):
     display_question(quiz, config)
 
 def display_question(quiz: Quiz, config: Config):
+    logger.info(f"Displaying question. Quiz mode: {quiz.mode}")
+    logger.info(f"Number of questions in all_questions: {len(quiz.all_questions)}")
+    logger.info(f"Number of questions in current_exam_questions: {len(quiz.current_exam_questions)}")
+    
     current_question = quiz.get_current_question()
+    if current_question is None:
+        st.error("No questions available.")
+        return
+    
+    logger.info(f"{quiz.mode.capitalize()} mode: Displaying question. ID: {current_question.id}")
     
     # Display question number
     st.markdown(f"<h2 style='font-size:{config.header_font_size}px;'>Question {current_question.id}</h2>", unsafe_allow_html=True)
-    
+      
     # Display case study if available
     if current_question.case_study_id:
         case_study = quiz.case_studies.get(current_question.case_study_id)
@@ -185,8 +236,7 @@ def display_question(quiz: Quiz, config: Config):
             else:
                 st.warning("Please select an answer before submitting.")
     
-    questions = quiz.current_exam_questions if quiz.mode == "exam" else quiz.all_questions
-    st.markdown(f"<p style='font-size:{config.body_font_size}px;'>Current Score: {quiz.score}/{len(questions)}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-size:{config.body_font_size}px;'>Current Score: {quiz.get_current_score()}</p>", unsafe_allow_html=True)
     
     # Navigation
     col1, col2, col3 = st.columns(3)
@@ -195,12 +245,13 @@ def display_question(quiz: Quiz, config: Config):
             quiz.go_to_question(quiz.current_index - 1)
             st.experimental_rerun()
     with col2:
-        go_to_page = st.number_input("Go to question", min_value=1, max_value=len(questions), value=quiz.current_index + 1, key=f"goto_{current_question.id}")
+        total_questions = quiz.get_total_questions()
+        go_to_page = st.number_input("Go to question", min_value=1, max_value=total_questions, value=quiz.current_index + 1, key=f"goto_{current_question.id}")
         if st.button("Go", key=f"go_{current_question.id}"):
             quiz.go_to_question(go_to_page - 1)
             st.experimental_rerun()
     with col3:
-        if st.button("Next", key=f"next_{current_question.id}", disabled=quiz.current_index == len(questions) - 1):
+        if st.button("Next", key=f"next_{current_question.id}", disabled=quiz.current_index == total_questions - 1):
             quiz.go_to_question(quiz.current_index + 1)
             st.experimental_rerun()
 

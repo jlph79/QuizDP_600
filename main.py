@@ -73,6 +73,9 @@ def main():
         logger.error("No questions loaded.")
         return
 
+    logger.info(f"Question IDs: {[q.id for q in questions]}")
+    logger.info(f"Case Study IDs: {list(case_studies.keys())}")
+
     # Handle the study_question route
     if "question_id" in query_params:
         question_id = query_params["question_id"][0]
@@ -113,6 +116,7 @@ def main():
                 st.session_state.quiz = Quiz(questions, case_studies, user.user_id, app_mode.lower())
                 st.session_state.quiz.load_progress()
                 logger.info(f"Quiz created and progress loaded successfully for {app_mode} mode.")
+                logger.info(f"Number of questions in quiz: {len(st.session_state.quiz.all_questions)}")
             except Exception as e:
                 logger.error(f"Error creating quiz or loading progress: {str(e)}")
                 logger.error(traceback.format_exc())

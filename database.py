@@ -54,6 +54,35 @@ def setup_database():
             else:
                 logger.info("exam_sessions table exists.")
 
+            # Check for user_progress table
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'user_progress'
+                )
+            """)
+            user_progress_exist = cursor.fetchone()['exists']
+
+            if not user_progress_exist:
+                logger.warning("user_progress table does not exist. Creating it now...")
+                create_user_progress_table(cursor)
+            else:
+                logger.info("user_progress table exists.")
+                # Check if current_exam_questions column exists
+                cursor.execute("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.columns 
+                        WHERE table_name = 'user_progress' AND column_name = 'current_exam_questions'
+                    )
+                """)
+                current_exam_questions_exist = cursor.fetchone()['exists']
+
+                if not current_exam_questions_exist:
+                    logger.warning("current_exam_questions column does not exist in user_progress table. Adding it now...")
+                    add_current_exam_questions_column(cursor)
+                else:
+                    logger.info("current_exam_questions column already exists in user_progress table.")
+
 def create_questions_table(cursor):
     cursor.execute('''
         CREATE TABLE questions (
@@ -86,6 +115,31 @@ def create_exam_sessions_table(cursor):
         )
     ''')
     logger.info("exam_sessions table created successfully.")
+
+def create_user_progress_table(cursor):
+    cursor.execute('''
+        CREATE TABLE user_progress (
+            user_id INTEGER NOT NULL,
+            mode TEXT NOT NULL,
+            current_index INTEGER,
+            score INTEGER,
+            user_answers JSONB,
+            practiced_questions JSONB,
+            incorrect_answers JSONB,
+            review_list JSONB,
+            algorithm_performance JSONB,
+            current_exam_questions JSONB,
+            PRIMARY KEY (user_id, mode)
+        )
+    ''')
+    logger.info("user_progress table created successfully.")
+
+def add_current_exam_questions_column(cursor):
+    cursor.execute('''
+        ALTER TABLE user_progress
+        ADD COLUMN current_exam_questions JSONB
+    ''')
+    logger.info("current_exam_questions column added to user_progress table successfully.")
 
 def insert_questions_and_case_studies(questions, case_studies):
     logger.info(f"Inserting {len(questions)} questions and {len(case_studies)} case studies...")
